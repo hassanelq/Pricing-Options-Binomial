@@ -1,0 +1,13 @@
+__pycache__/
+.pytest_cache/
+.venv/
+env/
+dist/
+build/
+node_modules/
+.next/
+.DS_Store
+*.log
+api/.env
+web/.env
+api/data/*.json
