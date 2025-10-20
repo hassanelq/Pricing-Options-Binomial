@@ -229,24 +229,10 @@ class OptionPricingService:
         convergence = []
 
         # Determine step sizes for better visualization
-        if model == "binomial":
-            if max_steps <= 50:
-                step_sizes = list(range(1, max_steps + 1, 1))
-            elif max_steps <= 500:
-                step_sizes = list(range(2, max_steps + 1, 1))
-            elif max_steps <= 1000:
-                step_sizes = list(range(2, max_steps + 1, 3))
-            else:
-                step_sizes = list(range(2, max_steps + 1, 5))
-        else:  # trinomial
-            if max_steps <= 50:
-                step_sizes = list(range(1, max_steps + 1, 1))
-            elif max_steps <= 200:
-                step_sizes = list(range(2, max_steps + 1, 2))
-            elif max_steps <= 500:
-                step_sizes = list(range(2, max_steps + 1, 5))
-            else:
-                step_sizes = list(range(2, max_steps + 1, 10))
+        if max_steps <= 500:
+            step_sizes = list(range(1, max_steps + 1, 1))
+        else:
+            step_sizes = list(range(1, max_steps + 1, 3))
 
         for steps in step_sizes:
             try:

@@ -13,6 +13,8 @@ interface InputFormProps {
   setForm: (form: any) => void;
   onCalculate: () => void;
   loading: boolean;
+  onDownloadReport?: () => void;
+  hasResults?: boolean;
 }
 
 export default function InputForm({
@@ -20,6 +22,8 @@ export default function InputForm({
   setForm,
   onCalculate,
   loading,
+  onDownloadReport,
+  hasResults,
 }: InputFormProps) {
   const handleChange = (field: string, value: string) => {
     setForm({ ...form, [field]: parseFloat(value) || 0 });
@@ -111,14 +115,36 @@ export default function InputForm({
         </div>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col sm:flex-row  justify-between gap-3">
         <Button
           onClick={onCalculate}
           disabled={loading}
-          className="w-full md:w-auto px-8 py-3 text-lg text-white font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
+          className="w-full sm:w-auto px-8 py-3 text-lg text-white font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700"
         >
           {loading ? "Calculating..." : "Calculate Prices"}
         </Button>
+
+        {hasResults && onDownloadReport && (
+          <button
+            onClick={onDownloadReport}
+            className="w-full sm:w-auto px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2 text-lg font-semibold"
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              />
+            </svg>
+            Download xlsx Report
+          </button>
+        )}
       </div>
     </div>
   );
