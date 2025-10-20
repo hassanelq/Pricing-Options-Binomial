@@ -3,41 +3,27 @@ Validation service for running option pricing tests
 """
 
 import numpy as np
-import math
 from .pricing import OptionPricingService
 
 
 class ValidationService:
     """Service for validating option pricing models"""
 
+    # -------------------- Public API --------------------
+
     @staticmethod
     def run_all_validations(
         S: float, K: float, T: float, r: float, sigma: float, N: int
     ) -> dict:
         """Run all validation tests and return results"""
+        categories = [
+            ValidationService._test_convergence(S, K, T, r, sigma, N),
+            ValidationService._test_european_pricing_accuracy(S, K, T, r, sigma, N),
+            ValidationService._test_arbitrage_and_parity(S, K, T, r, sigma, N),
+            ValidationService._test_american_checks(S, K, T, r, sigma, N),
+            ValidationService._test_risk_neutral(S, K, T, r, sigma, N),
+        ]
 
-        categories = []
-
-        # Test 1: Convergence
-        categories.append(ValidationService._test_convergence(S, K, T, r, sigma, N))
-        
-        # Test 2: European Pricing Accuracy
-        categories.append(
-            ValidationService._test_european_pricing_accuracy(S, K, T, r, sigma, N)
-        )
-
-        # Test 3: Arbitrage Sanity & Put-Call Parity
-        categories.append(
-            ValidationService._test_arbitrage_and_parity(S, K, T, r, sigma, N)
-        )
-
-        # Test 4: American-Specific Checks
-        categories.append(ValidationService._test_american_checks(S, K, T, r, sigma, N))
-
-        # Test 5: Risk-Neutral Probabilities
-        categories.append(ValidationService._test_risk_neutral(S, K, T, r, sigma, N))
-
-        # Calculate overall stats
         total_tests = sum(len(cat["tests"]) for cat in categories)
         passed_tests = sum(
             sum(1 for test in cat["tests"] if test["passed"]) for cat in categories
@@ -51,22 +37,25 @@ class ValidationService:
             "passed_tests": passed_tests,
         }
 
+    # -------------------- Tests --------------------
+
     @staticmethod
     def _test_european_pricing_accuracy(
         S: float, K: float, T: float, r: float, sigma: float, N: int
     ) -> dict:
         """Test 1: European pricing accuracy (Trees vs Black-Scholes)"""
 
+        # Reference prices (once)
         bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, "call")
         bs_put = OptionPricingService.black_scholes(S, K, T, r, sigma, "put")
 
+        # Trees (once)
         bin_call = OptionPricingService.binomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
         bin_put = OptionPricingService.binomial_tree(
             S, K, T, r, sigma, N, "put", "european"
         )
-
         tri_call = OptionPricingService.trinomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
@@ -74,13 +63,14 @@ class ValidationService:
             S, K, T, r, sigma, N, "put", "european"
         )
 
-        bin_call_error = abs(bin_call - bs_call) / bs_call * 100
-        bin_put_error = abs(bin_put - bs_put) / bs_put * 100
-        tri_call_error = abs(tri_call - bs_call) / bs_call * 100
-        tri_put_error = abs(tri_put - bs_put) / bs_put * 100
+        # Percentage errors (protect against division by ~0 using tiny eps)
+        eps = 1e-16
+        bin_call_error = abs(bin_call - bs_call) / max(abs(bs_call), eps) * 100.0
+        bin_put_error = abs(bin_put - bs_put) / max(abs(bs_put), eps) * 100.0
+        tri_call_error = abs(tri_call - bs_call) / max(abs(bs_call), eps) * 100.0
+        tri_put_error = abs(tri_put - bs_put) / max(abs(bs_put), eps) * 100.0
 
-        # Targets: Binomial ≤ 0.15%, Trinomial ≤ 0.08% at N=250
-        # Scale targets based on actual N
+        # Targets scaled with N (unchanged)
         bin_target = 0.15 * (250 / N) if N > 0 else 0.15
         tri_target = 0.08 * (250 / N) if N > 0 else 0.08
 
@@ -127,6 +117,7 @@ class ValidationService:
     ) -> dict:
         """Test 2: Arbitrage sanity + Put-Call Parity"""
 
+        # Prices once per model
         C_bin = OptionPricingService.binomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
@@ -141,29 +132,25 @@ class ValidationService:
         )
 
         K_pv = K * np.exp(-r * T)
+        expected_diff = S - K_pv  # C - P
 
-        # Put-call parity: C - P = S - Ke^(-rT)
-        expected_diff = S - K_pv
-        epsilon_bin = abs(C_bin - P_bin - expected_diff)
-        epsilon_tri = abs(C_tri - P_tri - expected_diff)
-
-        # Convert to percentage of notional
-        epsilon_bin_pct = (epsilon_bin / S) * 100
-        epsilon_tri_pct = (epsilon_tri / S) * 100
+        # Absolute parity gap, reported as % of S for readability
+        epsilon_bin_pct = abs((C_bin - P_bin) - expected_diff) / S * 100.0
+        epsilon_tri_pct = abs((C_tri - P_tri) - expected_diff) / S * 100.0
 
         tests = [
             {
                 "name": "Call Lower Bound (C ≥ max(S-Ke^(-rT), 0))",
-                "passed": C_bin >= max(S - K_pv, 0) - 1e-6,
+                "passed": C_bin >= max(S - K_pv, 0.0) - 1e-6,
                 "value": float(C_bin),
-                "target": float(max(S - K_pv, 0)),
+                "target": float(max(S - K_pv, 0.0)),
                 "unit": "$",
             },
             {
-                "name": "Put Lower Bound (P ≥ max(Ke^(-rT)-S, 0))",
-                "passed": P_bin >= max(K_pv - S, 0) - 1e-6,
+                "name": "Put  Lower Bound (P ≥ max(Ke^(-rT)-S, 0))",
+                "passed": P_bin >= max(K_pv - S, 0.0) - 1e-6,
                 "value": float(P_bin),
-                "target": float(max(K_pv - S, 0)),
+                "target": float(max(K_pv - S, 0.0)),
                 "unit": "$",
             },
             {
@@ -194,7 +181,7 @@ class ValidationService:
     ) -> dict:
         """Test 3: American-specific checks"""
 
-        # Binomial
+        # Binomial EU vs AM
         C_eu_bin = OptionPricingService.binomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
@@ -208,7 +195,7 @@ class ValidationService:
             S, K, T, r, sigma, N, "put", "american"
         )
 
-        # Trinomial
+        # Trinomial EU vs AM
         C_eu_tri = OptionPricingService.trinomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
@@ -271,8 +258,6 @@ class ValidationService:
         """Test 4: Convergence analysis"""
 
         bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, "call")
-
-        # Test at current N
         bin_call = OptionPricingService.binomial_tree(
             S, K, T, r, sigma, N, "call", "european"
         )
@@ -280,10 +265,11 @@ class ValidationService:
             S, K, T, r, sigma, N, "call", "european"
         )
 
-        bin_error = abs(bin_call - bs_call) / bs_call * 100
-        tri_error = abs(tri_call - bs_call) / bs_call * 100
+        eps = 1e-16
+        bin_error = abs(bin_call - bs_call) / max(abs(bs_call), eps) * 100.0
+        tri_error = abs(tri_call - bs_call) / max(abs(bs_call), eps) * 100.0
 
-        # Targets scale with N: at N=400 → 0.2% (bin), 0.1% (tri)
+        # Targets scale with N (unchanged)
         bin_target = 0.2 * (400 / N) if N > 0 else 0.2
         tri_target = 0.1 * (400 / N) if N > 0 else 0.1
 
@@ -318,60 +304,56 @@ class ValidationService:
 
         dt = T / N
 
-        # Binomial probabilities
+        # Binomial parameters
         u_bin = np.exp(sigma * np.sqrt(dt))
-        d_bin = 1 / u_bin
+        d_bin = 1.0 / u_bin
         p_bin = (np.exp(r * dt) - d_bin) / (u_bin - d_bin)
 
-        # Trinomial probabilities
-        u_tri = np.exp(sigma * np.sqrt(2 * dt))
-        d_tri = 1 / u_tri
-        pu_tri = (
-            (np.exp(r * dt / 2) - np.exp(-sigma * np.sqrt(dt / 2)))
-            / (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(-sigma * np.sqrt(dt / 2)))
-        ) ** 2
-        pd_tri = (
-            (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(r * dt / 2))
-            / (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(-sigma * np.sqrt(dt / 2)))
-        ) ** 2
-        pm_tri = 1 - pu_tri - pd_tri
+        # Trinomial (Boyle) parameters
+        u_tri = np.exp(sigma * np.sqrt(2.0 * dt))
+        d_tri = 1.0 / u_tri
+        a = np.exp(r * dt / 2.0)
+        b = np.exp(sigma * np.sqrt(dt / 2.0))
+        invb = 1.0 / b
+        denom = b - invb
+        pu_tri = ((a - invb) / denom) ** 2
+        pd_tri = ((b - a) / denom) ** 2
+        pm_tri = 1.0 - pu_tri - pd_tri
 
-        # Martingale property for binomial (only if N is reasonable)
-        martingale_error = 0.0
-        if N <= 100:  # Only compute for reasonable N
-            expected_ST = 0
-            for i in range(min(N + 1, 101)):  # Limit iterations
-                prob = math.comb(N, i) * (p_bin**i) * ((1 - p_bin) ** (N - i))
-                price = S * (u_bin**i) * (d_bin ** (N - i))
-                expected_ST += prob * price
+        # Analytical martingale check (faster, no loop):
+        # E[S_T] under binomial = S * (p*u + (1-p)*d)^N, target = S*exp(rT)
+        if N <= 100:  # keep same gating behavior
+            expected_ST = S * (p_bin * u_bin + (1.0 - p_bin) * d_bin) ** N
             theoretical_ST = S * np.exp(r * T)
-            martingale_error = abs(expected_ST - theoretical_ST) / S * 100
+            martingale_error = abs(expected_ST - theoretical_ST) / S * 100.0
+        else:
+            martingale_error = 0.0  # not computed for large N (same output semantics)
 
         tests = [
             {
                 "name": "Binomial Probability in [0,1]",
-                "passed": 0 <= p_bin <= 1,
+                "passed": 0.0 <= p_bin <= 1.0,
                 "value": float(p_bin),
                 "target": 0.5,
                 "unit": "",
             },
             {
                 "name": "Trinomial p_up in [0,1]",
-                "passed": 0 <= pu_tri <= 1,
+                "passed": 0.0 <= pu_tri <= 1.0,
                 "value": float(pu_tri),
                 "target": 0.33,
                 "unit": "",
             },
             {
                 "name": "Trinomial p_mid in [0,1]",
-                "passed": 0 <= pm_tri <= 1,
+                "passed": 0.0 <= pm_tri <= 1.0,
                 "value": float(pm_tri),
                 "target": 0.33,
                 "unit": "",
             },
             {
                 "name": "Trinomial p_down in [0,1]",
-                "passed": 0 <= pd_tri <= 1,
+                "passed": 0.0 <= pd_tri <= 1.0,
                 "value": float(pd_tri),
                 "target": 0.33,
                 "unit": "",

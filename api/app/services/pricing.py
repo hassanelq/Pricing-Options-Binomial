@@ -4,61 +4,64 @@ from typing import List
 
 
 class OptionPricingService:
-    """Service for calculating option prices using models"""
+    """Service for calculating option prices using models (no dividends)."""
+
+    # -------------------- validation --------------------
 
     @staticmethod
     def _validate_inputs(
-        S: float, K: float, T: float, r: float, sigma: float, N: int = None
+        S: float, K: float, T: float, r: float, sigma: float, N: int | None = None
     ):
-        """Validate input parameters"""
+        """Validate input parameters."""
         if S <= 0:
-            raise ValueError("Stock price S must be positive")
+            raise ValueError("Stock price S must be positive.")
         if K <= 0:
-            raise ValueError("Strike price K must be positive")
+            raise ValueError("Strike price K must be positive.")
         if T < 0:
-            raise ValueError("Time to maturity T must be non-negative")
+            raise ValueError("Time to maturity T must be non-negative.")
         if sigma < 0:
-            raise ValueError("Volatility sigma must be non-negative")
+            raise ValueError("Volatility sigma must be non-negative.")
         if N is not None and N < 1:
-            raise ValueError("Number of steps N must be at least 1")
+            raise ValueError("Number of steps N must be at least 1.")
+
+    # -------------------- Black–Scholes --------------------
 
     @staticmethod
     def black_scholes(
         S: float, K: float, T: float, r: float, sigma: float, option_type: str = "call"
     ) -> float:
-        """Calculate Black-Scholes option price"""
+        """Black–Scholes price for European call/put (q=0)."""
         OptionPricingService._validate_inputs(S, K, T, r, sigma)
 
-        # Handle edge case: at maturity
+        # Maturity payoff
         if T == 0:
-            if option_type == "call":
-                return max(S - K, 0)
-            else:
-                return max(K - S, 0)
+            return max(S - K, 0.0) if option_type == "call" else max(K - S, 0.0)
 
-        # Handle edge case: zero volatility
+        # Deterministic case (sigma=0)
         if sigma == 0:
-            if option_type == "call":
-                return max(S - K * np.exp(-r * T), 0)
-            else:
-                return max(K * np.exp(-r * T) - S, 0)
+            discK = K * np.exp(-r * T)
+            return max(S - discK, 0.0) if option_type == "call" else max(discK - S, 0.0)
 
-        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
-        d2 = d1 - sigma * np.sqrt(T)
+        sqrtT = np.sqrt(T)
+        d1 = (np.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT)
+        d2 = d1 - sigma * sqrtT
 
         if option_type == "call":
-            price = S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
-        else:  # put
-            price = K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
+            return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+        else:
+            return K * np.exp(-r * T) * norm.cdf(-d2) - S * norm.cdf(-d1)
 
-        return price
+    # -------------------- Greeks (call, BS) --------------------
 
     @staticmethod
     def calculate_greeks(S: float, K: float, T: float, r: float, sigma: float) -> dict:
-        """Calculate option Greeks for a call option"""
+        """
+        Black–Scholes Greeks for a CALL (q=0).
+        theta is per calendar day; vega and rho are per 1% change.
+        """
         OptionPricingService._validate_inputs(S, K, T, r, sigma)
 
-        # Handle edge cases
+        # Degenerate cases
         if T == 0 or sigma == 0:
             return {
                 "delta": 1.0 if S > K else 0.0,
@@ -68,25 +71,31 @@ class OptionPricingService:
                 "rho": 0.0,
             }
 
-        d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
-        d2 = d1 - sigma * np.sqrt(T)
+        sqrtT = np.sqrt(T)
+        d1 = (np.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT)
+        d2 = d1 - sigma * sqrtT
 
-        delta = norm.cdf(d1)
-        gamma = norm.pdf(d1) / (S * sigma * np.sqrt(T))
+        nd1 = norm.pdf(d1)
+        Nd1 = norm.cdf(d1)
+        Nd2 = norm.cdf(d2)
+
+        delta = Nd1
+        gamma = nd1 / (S * sigma * sqrtT)
         theta = (
-            -(S * norm.pdf(d1) * sigma) / (2 * np.sqrt(T))
-            - r * K * np.exp(-r * T) * norm.cdf(d2)
-        ) / 365
-        vega = S * norm.pdf(d1) * np.sqrt(T) / 100
-        rho = K * T * np.exp(-r * T) * norm.cdf(d2) / 100
+            -(S * nd1 * sigma) / (2.0 * sqrtT) - r * K * np.exp(-r * T) * Nd2
+        ) / 365.0
+        vega = (S * nd1 * sqrtT) / 100.0
+        rho = (K * T * np.exp(-r * T) * Nd2) / 100.0
 
         return {
-            "delta": delta,
-            "gamma": gamma,
-            "theta": theta,
-            "vega": vega,
-            "rho": rho,
+            "delta": float(delta),
+            "gamma": float(gamma),
+            "theta": float(theta),
+            "vega": float(vega),
+            "rho": float(rho),
         }
+
+    # -------------------- Binomial (CRR) --------------------
 
     @staticmethod
     def binomial_tree(
@@ -99,43 +108,45 @@ class OptionPricingService:
         option_type: str = "call",
         exercise_type: str = "european",
     ) -> float:
-        """Calculate option price using binomial tree model (CRR)"""
+        """CRR binomial tree for call/put, European/American (q=0)."""
         OptionPricingService._validate_inputs(S, K, T, r, sigma, N)
 
+        if T == 0:
+            return float(max(S - K, 0.0) if option_type == "call" else max(K - S, 0.0))
+
         dt = T / N
-        u = np.exp(sigma * np.sqrt(dt))
-        d = 1 / u
+        sqrt_dt = np.sqrt(dt)
+        u = np.exp(sigma * sqrt_dt)
+        d = 1.0 / u
+
+        # Risk-neutral probability; validate domain
         p = (np.exp(r * dt) - d) / (u - d)
-        discount = np.exp(-r * dt)
+        disc = np.exp(-r * dt)
 
-        # Initialize asset prices at maturity
-        asset_prices = S * (u ** np.arange(N, -1, -1)) * (d ** np.arange(0, N + 1))
-
-        # Initialize option values at maturity
-        if option_type == "call":
-            option_values = np.maximum(asset_prices - K, 0)
-        else:  # put
-            option_values = np.maximum(K - asset_prices, 0)
+        # Terminal payoffs
+        j = np.arange(N, -1, -1)
+        asset = S * (u**j) * (d ** (N - j))
+        vals = (
+            np.maximum(asset - K, 0.0)
+            if option_type == "call"
+            else np.maximum(K - asset, 0.0)
+        )
 
         # Backward induction
-        for j in range(N - 1, -1, -1):
-            # Update asset prices for this time step
-            asset_prices = S * (u ** np.arange(j, -1, -1)) * (d ** np.arange(0, j + 1))
-
-            # Discounted expected value
-            option_values = discount * (
-                p * option_values[:-1] + (1 - p) * option_values[1:]
-            )
-
-            # For American options, check early exercise
+        for i in range(N - 1, -1, -1):
+            vals = disc * (p * vals[:-1] + (1.0 - p) * vals[1:])
             if exercise_type == "american":
-                if option_type == "call":
-                    intrinsic = np.maximum(asset_prices - K, 0)
-                else:
-                    intrinsic = np.maximum(K - asset_prices, 0)
-                option_values = np.maximum(option_values, intrinsic)
+                asset = S * (u ** np.arange(i, -1, -1)) * (d ** np.arange(0, i + 1))
+                intrinsic = (
+                    np.maximum(asset - K, 0.0)
+                    if option_type == "call"
+                    else np.maximum(K - asset, 0.0)
+                )
+                vals = np.maximum(vals, intrinsic)
 
-        return float(option_values[0])
+        return float(vals[0])
+
+    # -------------------- Trinomial (Kamrad–Ritchken) --------------------
 
     @staticmethod
     def trinomial_tree(
@@ -148,72 +159,75 @@ class OptionPricingService:
         option_type: str = "call",
         exercise_type: str = "european",
     ) -> float:
-        """Calculate option price using trinomial tree model (Boyle method)"""
+        """
+        Trinomial tree using Boyle (1988) parameterization (q=0).
+        u = exp(sigma * sqrt(2*dt)), d = 1/u, middle move m = 1
+        Probabilities:
+        pu = ((exp(r*dt/2) - exp(-sigma*sqrt(dt/2))) /
+                (exp( sigma*sqrt(dt/2)) - exp(-sigma*sqrt(dt/2))))**2
+        pd = ((exp( sigma*sqrt(dt/2)) - exp(r*dt/2)) /
+                (exp( sigma*sqrt(dt/2)) - exp(-sigma*sqrt(dt/2))))**2
+        pm = 1 - pu - pd
+        """
         OptionPricingService._validate_inputs(S, K, T, r, sigma, N)
 
+        if T == 0:
+            return float(max(S - K, 0.0) if option_type == "call" else max(K - S, 0.0))
+
         dt = T / N
-        u = np.exp(sigma * np.sqrt(2 * dt))
-        d = 1 / u
-        m = 1  # middle node stays at current price
+        if sigma == 0.0:
+            # Deterministic limit consistent with BS branch
+            discK = K * np.exp(-r * T)
+            return float(max(S - discK, 0.0) if option_type == "call" else max(discK - S, 0.0))
 
-        # Boyle (1988) probabilities - corrected formulas
-        pu = (
-            (np.exp(r * dt / 2) - np.exp(-sigma * np.sqrt(dt / 2)))
-            / (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(-sigma * np.sqrt(dt / 2)))
-        ) ** 2
-        pd = (
-            (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(r * dt / 2))
-            / (np.exp(sigma * np.sqrt(dt / 2)) - np.exp(-sigma * np.sqrt(dt / 2)))
-        ) ** 2
-        pm = 1 - pu - pd
+        # Boyle up/down
+        u = np.exp(sigma * np.sqrt(2.0 * dt))
+        d = 1.0 / u
 
-        # Validate probabilities
-        if not (0 <= pu <= 1 and 0 <= pd <= 1 and 0 <= pm <= 1):
-            raise ValueError(
-                f"Invalid probabilities: pu={pu:.4f}, pm={pm:.4f}, pd={pd:.4f}"
-            )
+        a = np.exp(r * dt / 2.0)
+        b = np.exp(sigma * np.sqrt(dt / 2.0))
+        invb = 1.0 / b
 
-        discount = np.exp(-r * dt)
+        denom = b - invb
+        pu = ((a - invb) / denom) ** 2
+        pd = ((b - a) / denom) ** 2
+        pm = 1.0 - pu - pd
 
-        # Initialize option values at maturity (step N)
-        option_values = np.zeros(2 * N + 1)
+        # Validate probabilities with tiny tolerance
+        eps = 1e-12
+        if not (-eps <= pu <= 1.0 + eps and -eps <= pm <= 1.0 + eps and -eps <= pd <= 1.0 + eps):
+            raise ValueError(f"Invalid trinomial probabilities: pu={pu:.8f}, pm={pm:.8f}, pd={pd:.8f}. Increase N or adjust parameters.")
 
-        for i in range(2 * N + 1):
-            j = i - N  # net number of up moves
-            stock_price = S * (u ** max(j, 0)) * (d ** max(-j, 0))
+        disc = np.exp(-r * dt)
 
-            if option_type == "call":
-                option_values[i] = max(stock_price - K, 0)
-            else:
-                option_values[i] = max(K - stock_price, 0)
+        # Terminal payoffs: size 2N+1, map idx 0..2N -> j in [-N..N]
+        vals = np.empty(2 * N + 1)
+        for idx in range(2 * N + 1):
+            j = idx - N  # net up moves
+            S_T = S * (u ** max(j, 0)) * (d ** max(-j, 0))
+            vals[idx] = max(S_T - K, 0.0) if option_type == "call" else max(K - S_T, 0.0)
 
-        # Backward induction through the tree
+        # Backward induction
         for step in range(N - 1, -1, -1):
-            new_values = np.zeros(2 * step + 1)
-
+            new_vals = np.empty(2 * step + 1)
             for i in range(2 * step + 1):
-                # This node connects to nodes i, i+1, i+2 in the next level
-                new_values[i] = discount * (
-                    pu * option_values[i + 2]
-                    + pm * option_values[i + 1]
-                    + pd * option_values[i]
-                )
+                # Links to i (down), i+1 (mid), i+2 (up)
+                cont = disc * (pu * vals[i + 2] + pm * vals[i + 1] + pd * vals[i])
 
-                # For American options, check early exercise
                 if exercise_type == "american":
                     j = i - step
-                    stock_price = S * (u ** max(j, 0)) * (d ** max(-j, 0))
+                    S_it = S * (u ** max(j, 0)) * (d ** max(-j, 0))
+                    intrinsic = (S_it - K) if option_type == "call" else (K - S_it)
+                    intrinsic = intrinsic if intrinsic > 0.0 else 0.0
+                    new_vals[i] = cont if cont > intrinsic else intrinsic
+                else:
+                    new_vals[i] = cont
 
-                    if option_type == "call":
-                        intrinsic = max(stock_price - K, 0)
-                    else:
-                        intrinsic = max(K - stock_price, 0)
+            vals = new_vals
 
-                    new_values[i] = max(new_values[i], intrinsic)
+        return float(vals[0])
 
-            option_values = new_values
-
-        return float(option_values[0])
+    # -------------------- Convergence curve --------------------
 
     @staticmethod
     def calculate_convergence(
@@ -225,14 +239,15 @@ class OptionPricingService:
         max_steps: int,
         model: str = "binomial",
     ) -> List[dict]:
-        """Calculate convergence to Black-Scholes as steps increase"""
-        convergence = []
+        """Compute tree price vs. steps to visualize convergence (call, European)."""
+        convergence: List[dict] = []
 
-        # Determine step sizes for better visualization
-        if max_steps <= 500:
-            step_sizes = list(range(1, max_steps + 1, 1))
-        else:
-            step_sizes = list(range(1, max_steps + 1, 3))
+        # Denser grid for small N, coarser for large
+        step_sizes = (
+            list(range(1, max_steps + 1))
+            if max_steps <= 500
+            else list(range(1, max_steps + 1, 3))
+        )
 
         for steps in step_sizes:
             try:
@@ -240,49 +255,44 @@ class OptionPricingService:
                     price = OptionPricingService.binomial_tree(
                         S, K, T, r, sigma, steps, "call", "european"
                     )
-                else:  # trinomial
+                else:
                     price = OptionPricingService.trinomial_tree(
                         S, K, T, r, sigma, steps, "call", "european"
                     )
                 convergence.append({"steps": steps, "price": float(price)})
-            except ValueError as e:
-                # Skip steps that produce invalid probabilities
+            except ValueError:
+                # Skip invalid parameter regions (e.g., probs out of bounds for tiny N)
                 continue
 
         return convergence
+
+    # -------------------- Aggregate --------------------
 
     @classmethod
     def calculate_all(
         cls, S: float, K: float, T: float, r: float, sigma: float, N: int
     ) -> dict:
-        """Calculate all pricing models and return results"""
+        """Run BS, binomial, trinomial (no dividends) and return a summary."""
         cls._validate_inputs(S, K, T, r, sigma, N)
 
-        # Black-Scholes
+        # Black–Scholes
         bs_call = cls.black_scholes(S, K, T, r, sigma, "call")
         bs_put = cls.black_scholes(S, K, T, r, sigma, "put")
         greeks = cls.calculate_greeks(S, K, T, r, sigma)
 
-        # Binomial Tree
-        binomial_euro_call = cls.binomial_tree(S, K, T, r, sigma, N, "call", "european")
-        binomial_euro_put = cls.binomial_tree(S, K, T, r, sigma, N, "put", "european")
-        # American call = European call for non-dividend stocks
-        binomial_amer_call = binomial_euro_call
-        binomial_amer_put = cls.binomial_tree(S, K, T, r, sigma, N, "put", "american")
-        binomial_convergence = cls.calculate_convergence(
-            S, K, T, r, sigma, N, "binomial"
-        )
+        # Binomial
+        bino_eu_c = cls.binomial_tree(S, K, T, r, sigma, N, "call", "european")
+        bino_eu_p = cls.binomial_tree(S, K, T, r, sigma, N, "put", "european")
+        bino_am_c = bino_eu_c  # no dividends -> early exercise not optimal for call
+        bino_am_p = cls.binomial_tree(S, K, T, r, sigma, N, "put", "american")
+        bino_conv = cls.calculate_convergence(S, K, T, r, sigma, N, "binomial")
 
-        # Trinomial Tree
-        trinomial_euro_call = cls.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
-        )
-        trinomial_euro_put = cls.trinomial_tree(S, K, T, r, sigma, N, "put", "european")
-        trinomial_amer_call = trinomial_euro_call
-        trinomial_amer_put = cls.trinomial_tree(S, K, T, r, sigma, N, "put", "american")
-        trinomial_convergence = cls.calculate_convergence(
-            S, K, T, r, sigma, N, "trinomial"
-        )
+        # Trinomial
+        trino_eu_c = cls.trinomial_tree(S, K, T, r, sigma, N, "call", "european")
+        trino_eu_p = cls.trinomial_tree(S, K, T, r, sigma, N, "put", "european")
+        trino_am_c = trino_eu_c  # same rationale (q=0)
+        trino_am_p = cls.trinomial_tree(S, K, T, r, sigma, N, "put", "american")
+        trino_conv = cls.calculate_convergence(S, K, T, r, sigma, N, "trinomial")
 
         return {
             "black_scholes": {
@@ -291,17 +301,17 @@ class OptionPricingService:
                 "greeks": greeks,
             },
             "binomial": {
-                "european_call": float(binomial_euro_call),
-                "european_put": float(binomial_euro_put),
-                "american_call": float(binomial_amer_call),
-                "american_put": float(binomial_amer_put),
-                "convergence": binomial_convergence,
+                "european_call": float(bino_eu_c),
+                "european_put": float(bino_eu_p),
+                "american_call": float(bino_am_c),
+                "american_put": float(bino_am_p),
+                "convergence": bino_conv,
             },
             "trinomial": {
-                "european_call": float(trinomial_euro_call),
-                "european_put": float(trinomial_euro_put),
-                "american_call": float(trinomial_amer_call),
-                "american_put": float(trinomial_amer_put),
-                "convergence": trinomial_convergence,
+                "european_call": float(trino_eu_c),
+                "european_put": float(trino_eu_p),
+                "american_call": float(trino_am_c),
+                "american_put": float(trino_am_p),
+                "convergence": trino_conv,
             },
         }
