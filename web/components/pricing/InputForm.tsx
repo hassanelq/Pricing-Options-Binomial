@@ -9,6 +9,7 @@ interface InputFormProps {
     r: number;
     sigma: number;
     steps: number;
+    q: number;
   };
   setForm: (form: any) => void;
   onCalculate: () => void;
@@ -98,6 +99,19 @@ export default function InputForm({
             onChange={(e) => handleChange("sigma", e.target.value)}
             className="w-full"
             step="0.01"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300">
+            Dividend Yield (q)
+          </label>
+          <Input
+            type="number"
+            value={form.q}
+            onChange={(e) => handleChange("q", e.target.value)}
+            className="w-full"
+            step="0.001"
           />
         </div>
 

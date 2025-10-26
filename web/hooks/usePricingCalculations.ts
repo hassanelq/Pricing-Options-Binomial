@@ -30,6 +30,12 @@ interface ValidationResults {
   passed_tests: number;
 }
 
+interface BoundaryPoint {
+  time: number;
+  stock_price: number;
+  time_to_maturity: number;
+}
+
 interface ApiResponse {
   black_scholes: {
     call_price: number;
@@ -42,6 +48,8 @@ interface ApiResponse {
     american_call: number;
     american_put: number;
     convergence: Array<{ steps: number; price: number }>;
+    boundary_put: BoundaryPoint[];
+    boundary_call: BoundaryPoint[];
   };
   trinomial: {
     european_call: number;
@@ -49,6 +57,8 @@ interface ApiResponse {
     american_call: number;
     american_put: number;
     convergence: Array<{ steps: number; price: number }>;
+    boundary_put: BoundaryPoint[];
+    boundary_call: BoundaryPoint[];
   };
   validation: ValidationResults;
 }
@@ -66,6 +76,8 @@ interface Results {
     americanCall: number;
     americanPut: number;
     convergence: Array<{ steps: number; price: number; error: number }>;
+    boundaryPut: BoundaryPoint[];
+    boundaryCall: BoundaryPoint[];
   } | null;
   trinomial: {
     europeanCall: number;
@@ -73,6 +85,8 @@ interface Results {
     americanCall: number;
     americanPut: number;
     convergence: Array<{ steps: number; price: number; error: number }>;
+    boundaryPut: BoundaryPoint[];
+    boundaryCall: BoundaryPoint[];
   } | null;
   validation: ValidationResults | null;
 }export function usePricingCalculations() {
@@ -91,6 +105,7 @@ interface Results {
     r: number;
     sigma: number;
     steps: number;
+    q: number;
   }) => {
     setLoading(true);
     setResults({ blackScholes: null, binomial: null, trinomial: null, validation: null });
@@ -103,15 +118,19 @@ interface Results {
         riskFreeRate: +form.r,
         volatility: +form.sigma,
         treeSteps: +form.steps,
+        dividendYield: +form.q,
       });
 
       // Extract Black-Scholes data
       const callGreeks = response.black_scholes.greeks;
       const bsCallPrice = response.black_scholes.call_price;
       
-      // Calculate put Greeks using put-call parity relationships
+      // Calculate put Greeks using put-call parity relationships with dividends
+      // With dividends: C - P = S*e^(-qT) - K*e^(-rT)
+      // Delta_put = Delta_call - e^(-qT)
+      // Rho_put = Rho_call - K*T*e^(-rT)
       const putGreeks: Greeks = {
-        delta: callGreeks.delta - 1,
+        delta: callGreeks.delta - Math.exp(-form.q * form.t),
         gamma: callGreeks.gamma,
         theta: callGreeks.theta,
         vega: callGreeks.vega,
@@ -146,6 +165,8 @@ interface Results {
           americanCall: response.binomial.american_call,
           americanPut: response.binomial.american_put,
           convergence: binConvergence,
+          boundaryPut: response.binomial.boundary_put,
+          boundaryCall: response.binomial.boundary_call,
         },
         trinomial: {
           europeanCall: response.trinomial.european_call,
@@ -153,6 +174,8 @@ interface Results {
           americanCall: response.trinomial.american_call,
           americanPut: response.trinomial.american_put,
           convergence: triConvergence,
+          boundaryPut: response.trinomial.boundary_put,
+          boundaryCall: response.trinomial.boundary_call,
         },
         validation: response.validation,
       });

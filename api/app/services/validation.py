@@ -13,15 +13,15 @@ class ValidationService:
 
     @staticmethod
     def run_all_validations(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Run all validation tests and return results"""
         categories = [
-            ValidationService._test_convergence(S, K, T, r, sigma, N),
-            ValidationService._test_european_pricing_accuracy(S, K, T, r, sigma, N),
-            ValidationService._test_arbitrage_and_parity(S, K, T, r, sigma, N),
-            ValidationService._test_american_checks(S, K, T, r, sigma, N),
-            ValidationService._test_risk_neutral(S, K, T, r, sigma, N),
+            ValidationService._test_convergence(S, K, T, r, sigma, N, q),
+            ValidationService._test_european_pricing_accuracy(S, K, T, r, sigma, N, q),
+            ValidationService._test_arbitrage_and_parity(S, K, T, r, sigma, N, q),
+            ValidationService._test_american_checks(S, K, T, r, sigma, N, q),
+            ValidationService._test_risk_neutral(S, K, T, r, sigma, N, q),
         ]
 
         total_tests = sum(len(cat["tests"]) for cat in categories)
@@ -41,26 +41,26 @@ class ValidationService:
 
     @staticmethod
     def _test_european_pricing_accuracy(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Test 1: European pricing accuracy (Trees vs Black-Scholes)"""
 
         # Reference prices (once)
-        bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, "call")
-        bs_put = OptionPricingService.black_scholes(S, K, T, r, sigma, "put")
+        bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, q, "call")
+        bs_put = OptionPricingService.black_scholes(S, K, T, r, sigma, q, "put")
 
         # Trees (once)
         bin_call = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
         bin_put = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
         tri_call = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
         tri_put = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
 
         # Percentage errors (protect against division by ~0 using tiny eps)
@@ -113,26 +113,27 @@ class ValidationService:
 
     @staticmethod
     def _test_arbitrage_and_parity(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Test 2: Arbitrage sanity + Put-Call Parity"""
 
         # Prices once per model
         C_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
         P_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
         C_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
         P_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
 
         K_pv = K * np.exp(-r * T)
-        expected_diff = S - K_pv  # C - P
+        S_pv = S * np.exp(-q * T)  # Dividend-adjusted spot price
+        expected_diff = S_pv - K_pv  # C - P = S*e^(-qT) - K*e^(-rT)
 
         # Absolute parity gap, reported as % of S for readability
         epsilon_bin_pct = abs((C_bin - P_bin) - expected_diff) / S * 100.0
@@ -140,17 +141,17 @@ class ValidationService:
 
         tests = [
             {
-                "name": "Call Lower Bound (C ≥ max(S-Ke^(-rT), 0))",
-                "passed": C_bin >= max(S - K_pv, 0.0) - 1e-6,
+                "name": "Call Lower Bound (C ≥ max(S*e^(-qT)-Ke^(-rT), 0))",
+                "passed": C_bin >= max(S_pv - K_pv, 0.0) - 1e-6,
                 "value": float(C_bin),
-                "target": float(max(S - K_pv, 0.0)),
+                "target": float(max(S_pv - K_pv, 0.0)),
                 "unit": "$",
             },
             {
-                "name": "Put  Lower Bound (P ≥ max(Ke^(-rT)-S, 0))",
-                "passed": P_bin >= max(K_pv - S, 0.0) - 1e-6,
+                "name": "Put  Lower Bound (P ≥ max(Ke^(-rT)-S*e^(-qT), 0))",
+                "passed": P_bin >= max(K_pv - S_pv, 0.0) - 1e-6,
                 "value": float(P_bin),
-                "target": float(max(K_pv - S, 0.0)),
+                "target": float(max(K_pv - S_pv, 0.0)),
                 "unit": "$",
             },
             {
@@ -177,58 +178,30 @@ class ValidationService:
 
     @staticmethod
     def _test_american_checks(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Test 3: American-specific checks"""
 
         # Binomial EU vs AM
-        C_eu_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
-        )
-        C_am_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "call", "american"
-        )
         P_eu_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
         P_am_bin = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "put", "american"
+            S, K, T, r, sigma, N, q, "put", "american"
         )
 
         # Trinomial EU vs AM
-        C_eu_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
-        )
-        C_am_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "american"
-        )
         P_eu_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "put", "european"
+            S, K, T, r, sigma, N, q, "put", "european"
         )
         P_am_tri = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "put", "american"
+            S, K, T, r, sigma, N, q, "put", "american"
         )
 
-        diff_call_bin = abs(C_am_bin - C_eu_bin)
-        diff_call_tri = abs(C_am_tri - C_eu_tri)
         premium_put_bin = P_am_bin - P_eu_bin
         premium_put_tri = P_am_tri - P_eu_tri
 
         tests = [
-            {
-                "name": "No Early Exercise - Call (Binomial)",
-                "passed": diff_call_bin <= 1e-4,
-                "value": float(diff_call_bin),
-                "target": 1e-4,
-                "unit": "$",
-            },
-            {
-                "name": "No Early Exercise - Call (Trinomial)",
-                "passed": diff_call_tri <= 1e-4,
-                "value": float(diff_call_tri),
-                "target": 1e-4,
-                "unit": "$",
-            },
             {
                 "name": "Put Early Exercise Premium (Binomial)",
                 "passed": premium_put_bin >= -1e-6,
@@ -253,16 +226,16 @@ class ValidationService:
 
     @staticmethod
     def _test_convergence(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Test 4: Convergence analysis"""
 
-        bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, "call")
+        bs_call = OptionPricingService.black_scholes(S, K, T, r, sigma, q, "call")
         bin_call = OptionPricingService.binomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
         tri_call = OptionPricingService.trinomial_tree(
-            S, K, T, r, sigma, N, "call", "european"
+            S, K, T, r, sigma, N, q, "call", "european"
         )
 
         eps = 1e-16
@@ -298,21 +271,21 @@ class ValidationService:
 
     @staticmethod
     def _test_risk_neutral(
-        S: float, K: float, T: float, r: float, sigma: float, N: int
+        S: float, K: float, T: float, r: float, sigma: float, N: int, q: float = 0.0
     ) -> dict:
         """Test 5: Risk-neutral / martingale validity"""
 
         dt = T / N
 
-        # Binomial parameters
+        # Binomial parameters (with dividend yield)
         u_bin = np.exp(sigma * np.sqrt(dt))
         d_bin = 1.0 / u_bin
-        p_bin = (np.exp(r * dt) - d_bin) / (u_bin - d_bin)
+        p_bin = (np.exp((r - q) * dt) - d_bin) / (u_bin - d_bin)
 
-        # Trinomial (Boyle) parameters
+        # Trinomial (Boyle) parameters (with dividend yield)
         u_tri = np.exp(sigma * np.sqrt(2.0 * dt))
         d_tri = 1.0 / u_tri
-        a = np.exp(r * dt / 2.0)
+        a = np.exp((r - q) * dt / 2.0)
         b = np.exp(sigma * np.sqrt(dt / 2.0))
         invb = 1.0 / b
         denom = b - invb
@@ -321,10 +294,10 @@ class ValidationService:
         pm_tri = 1.0 - pu_tri - pd_tri
 
         # Analytical martingale check (faster, no loop):
-        # E[S_T] under binomial = S * (p*u + (1-p)*d)^N, target = S*exp(rT)
+        # E[S_T] under binomial = S * (p*u + (1-p)*d)^N, target = S*exp((r-q)T)
         if N <= 100:  # keep same gating behavior
             expected_ST = S * (p_bin * u_bin + (1.0 - p_bin) * d_bin) ** N
-            theoretical_ST = S * np.exp(r * T)
+            theoretical_ST = S * np.exp((r - q) * T)
             martingale_error = abs(expected_ST - theoretical_ST) / S * 100.0
         else:
             martingale_error = 0.0  # not computed for large N (same output semantics)

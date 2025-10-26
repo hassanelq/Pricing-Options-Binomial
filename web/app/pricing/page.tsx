@@ -1,6 +1,7 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import * as XLSX from "xlsx";
 import InputForm from "@/components/pricing/InputForm";
 import BlackScholesSection from "@/components/pricing/BlackScholesSection";
@@ -9,14 +10,32 @@ import ConvergenceTestSection from "@/components/pricing/ConvergenceTestSection"
 import ValidationSection from "@/components/pricing/ValidationSection";
 import { usePricingCalculations } from "../../hooks/usePricingCalculations";
 
+// Dynamically import plot components to avoid SSR issues
+const PutEarlyExercisePlot = dynamic(
+  () =>
+    import("@/components/pricing/EarlyExercisePlot").then(
+      (mod) => mod.PutEarlyExercisePlot
+    ),
+  { ssr: false }
+);
+
+const CallEarlyExercisePlot = dynamic(
+  () =>
+    import("@/components/pricing/EarlyExercisePlot").then(
+      (mod) => mod.CallEarlyExercisePlot
+    ),
+  { ssr: false }
+);
+
 export default function PricingPage() {
   const [form, setForm] = useState({
-    s0: 100,
+    s0: 90,
     k: 100,
     t: 1,
-    r: 0.025,
-    sigma: 0.25,
-    steps: 100,
+    r: 0.03,
+    sigma: 0.4,
+    steps: 50,
+    q: 0.01,
   });
 
   const { loading, results, calculateAll } = usePricingCalculations();
@@ -42,6 +61,7 @@ export default function PricingPage() {
       ["Time to Maturity (T)", `${form.t} years`],
       ["Risk-Free Rate (r)", `${(form.r * 100).toFixed(2)}%`],
       ["Volatility (σ)", `${(form.sigma * 100).toFixed(2)}%`],
+      ["Dividend Yield (q)", `${(form.q * 100).toFixed(2)}%`],
       ["Tree Steps (N)", form.steps],
     ];
     const inputSheet = XLSX.utils.aoa_to_sheet(inputData);
@@ -180,6 +200,71 @@ export default function PricingPage() {
     const validationSheet = XLSX.utils.aoa_to_sheet(validationData);
     XLSX.utils.book_append_sheet(workbook, validationSheet, "Validation");
 
+    // Sheet 6: Early Exercise Boundary
+    if (results.binomial && results.trinomial) {
+      const boundaryData = [
+        ["EARLY EXERCISE BOUNDARY ANALYSIS"],
+        [],
+        ["PUT OPTIONS - Optimal Exercise Frontier"],
+        [
+          "Time (years)",
+          "Binomial Boundary",
+          "Trinomial Boundary",
+          "Strike Price",
+        ],
+      ];
+
+      // Combine put boundaries
+      const maxPutLength = Math.max(
+        results.binomial.boundaryPut.length,
+        results.trinomial.boundaryPut.length
+      );
+
+      for (let i = 0; i < maxPutLength; i++) {
+        const binPoint = results.binomial.boundaryPut[i];
+        const triPoint = results.trinomial.boundaryPut[i];
+        boundaryData.push([
+          binPoint ? binPoint.time.toFixed(4) : "N/A",
+          binPoint ? `$${binPoint.stock_price.toFixed(4)}` : "N/A",
+          triPoint ? `$${triPoint.stock_price.toFixed(4)}` : "N/A",
+          `$${form.k}`,
+        ]);
+      }
+
+      // Add call boundaries if dividends exist
+      if (form.q > 0) {
+        boundaryData.push(
+          [],
+          ["CALL OPTIONS - Optimal Exercise Frontier (with Dividends)"],
+          [
+            "Time (years)",
+            "Binomial Boundary",
+            "Trinomial Boundary",
+            "Strike Price",
+          ]
+        );
+
+        const maxCallLength = Math.max(
+          results.binomial.boundaryCall.length,
+          results.trinomial.boundaryCall.length
+        );
+
+        for (let i = 0; i < maxCallLength; i++) {
+          const binPoint = results.binomial.boundaryCall[i];
+          const triPoint = results.trinomial.boundaryCall[i];
+          boundaryData.push([
+            binPoint ? binPoint.time.toFixed(4) : "N/A",
+            binPoint ? `$${binPoint.stock_price.toFixed(4)}` : "N/A",
+            triPoint ? `$${triPoint.stock_price.toFixed(4)}` : "N/A",
+            `$${form.k}`,
+          ]);
+        }
+      }
+
+      const boundarySheet = XLSX.utils.aoa_to_sheet(boundaryData);
+      XLSX.utils.book_append_sheet(workbook, boundarySheet, "Early Exercise");
+    }
+
     // Generate Excel file and download
     XLSX.writeFile(workbook, `option-pricing-report-${Date.now()}.xlsx`);
   };
@@ -270,6 +355,26 @@ export default function PricingPage() {
             bsPrice={results.blackScholes.callPrice}
             binomialConvergence={results.binomial.convergence}
             trinomialConvergence={results.trinomial.convergence}
+          />
+        )}
+
+        {/* Put Early Exercise Boundary - Always shown */}
+        {results.binomial && results.trinomial && (
+          <PutEarlyExercisePlot
+            binomialBoundary={results.binomial.boundaryPut}
+            trinomialBoundary={results.trinomial.boundaryPut}
+            strikePrice={form.k}
+            spotPrice={form.s0}
+          />
+        )}
+
+        {/* Call Early Exercise Boundary - Only shown when dividends > 0 */}
+        {results.binomial && results.trinomial && form.q > 0 && (
+          <CallEarlyExercisePlot
+            binomialBoundary={results.binomial.boundaryCall}
+            trinomialBoundary={results.trinomial.boundaryCall}
+            strikePrice={form.k}
+            spotPrice={form.s0}
           />
         )}
 

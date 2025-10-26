@@ -9,6 +9,7 @@ class PricingRequest(BaseModel):
     risk_free_rate: float = Field(..., alias="riskFreeRate")
     volatility: float = Field(..., alias="volatility")
     tree_steps: int = Field(..., alias="treeSteps")
+    dividend_yield: float = Field(0.0, alias="dividendYield")
 
 
 class Greeks(BaseModel):
@@ -30,12 +31,20 @@ class ConvergencePoint(BaseModel):
     price: float
 
 
+class BoundaryPoint(BaseModel):
+    time: float
+    stock_price: float
+    time_to_maturity: float
+
+
 class TreeResult(BaseModel):
     european_call: float
     european_put: float
     american_call: float
     american_put: float
     convergence: List[ConvergencePoint]
+    boundary_put: List[BoundaryPoint]
+    boundary_call: List[BoundaryPoint]
 
 
 class TestResult(BaseModel):

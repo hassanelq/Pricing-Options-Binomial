@@ -11,7 +11,7 @@ async def calculate_option_prices(request: PricingRequest):
     """
     Calculate option prices using Black-Scholes, Binomial, and Trinomial models.
 
-    Takes spot price, strike, time to maturity, risk-free rate, volatility, and tree steps.
+    Takes spot price, strike, time to maturity, risk-free rate, volatility, dividend yield, and tree steps.
     Returns pricing results from all three models including Greeks, convergence data, and validation tests.
     """
     try:
@@ -23,6 +23,7 @@ async def calculate_option_prices(request: PricingRequest):
             r=request.risk_free_rate,
             sigma=request.volatility,
             N=request.tree_steps,
+            q=request.dividend_yield,
         )
 
         # Run validation tests
@@ -33,6 +34,7 @@ async def calculate_option_prices(request: PricingRequest):
             r=request.risk_free_rate,
             sigma=request.volatility,
             N=request.tree_steps,
+            q=request.dividend_yield,
         )
 
         # Combine results
