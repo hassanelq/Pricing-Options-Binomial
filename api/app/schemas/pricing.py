@@ -37,6 +37,23 @@ class BoundaryPoint(BaseModel):
     time_to_maturity: float
 
 
+class TreeNode(BaseModel):
+    stock: float
+    european: float
+    american: float
+    early: bool
+
+
+class TreeLattice(BaseModel):
+    N: int
+    levels: List[List[TreeNode]]
+
+
+class TreesData(BaseModel):
+    put: dict  # Contains binomial and trinomial TreeLattice for put
+    call: dict  # Contains binomial and trinomial TreeLattice for call
+
+
 class TreeResult(BaseModel):
     european_call: float
     european_put: float
@@ -72,4 +89,5 @@ class PricingResponse(BaseModel):
     black_scholes: BlackScholesResult
     binomial: TreeResult
     trinomial: TreeResult
+    trees: TreesData
     validation: ValidationResults

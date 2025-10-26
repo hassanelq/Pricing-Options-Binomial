@@ -238,25 +238,24 @@ class OptionPricingService:
 
         disc = np.exp(-r * dt)
 
-        # Terminal payoffs: size 2N+1, map idx 0..2N -> j in [-N..N]
+        # Terminal payoffs: size 2N+1, index i corresponds to k = i - N net up moves
         vals = np.empty(2 * N + 1)
-        for idx in range(2 * N + 1):
-            j = idx - N  # net up moves
-            S_T = S * (u ** max(j, 0)) * (d ** max(-j, 0))
-            vals[idx] = (
-                max(S_T - K, 0.0) if option_type == "call" else max(K - S_T, 0.0)
-            )
+        for i in range(2 * N + 1):
+            k = i - N  # net up moves
+            S_T = S * (u**k)
+            vals[i] = max(S_T - K, 0.0) if option_type == "call" else max(K - S_T, 0.0)
 
         # Backward induction
         for step in range(N - 1, -1, -1):
             new_vals = np.empty(2 * step + 1)
             for i in range(2 * step + 1):
-                # Links to i (down), i+1 (mid), i+2 (up)
-                cont = disc * (pu * vals[i + 2] + pm * vals[i + 1] + pd * vals[i])
+                # Current node k = i - step connects to:
+                # k-1 (down, index i), k (mid, index i+1), k+1 (up, index i+2)
+                cont = disc * (pd * vals[i] + pm * vals[i + 1] + pu * vals[i + 2])
 
                 if exercise_type == "american":
-                    j = i - step
-                    S_it = S * (u ** max(j, 0)) * (d ** max(-j, 0))
+                    k = i - step
+                    S_it = S * (u**k)
                     intrinsic = (S_it - K) if option_type == "call" else (K - S_it)
                     intrinsic = intrinsic if intrinsic > 0.0 else 0.0
                     new_vals[i] = cont if cont > intrinsic else intrinsic
@@ -306,6 +305,241 @@ class OptionPricingService:
                 continue
 
         return convergence
+
+    # -------------------- Tree builders for plotting --------------------
+
+    @staticmethod
+    def build_binomial_lattice(
+        S: float,
+        K: float,
+        T: float,
+        r: float,
+        sigma: float,
+        N: int,
+        q: float = 0.0,
+        option_type: str = "put",
+    ) -> dict:
+        """Build a CRR binomial lattice returning per-node stock, option (EU & AM) and early-exercise flags.
+
+        Returns a dict with keys: 'levels' (list of levels; each level is list of nodes),
+        where node is {'stock': float, 'european': float, 'american': float, 'early': bool}.
+        """
+        OptionPricingService._validate_inputs(S, K, T, r, sigma, q, N)
+
+        if T == 0:
+            # Degenerate single node
+            stock = S
+            intrinsic = max(K - S, 0.0) if option_type == "put" else max(S - K, 0.0)
+            node = {
+                "stock": float(stock),
+                "european": float(intrinsic),
+                "american": float(intrinsic),
+                "early": bool(intrinsic > 0.0),
+            }
+            return {"N": N, "levels": [[node]]}
+
+        dt = T / N
+        sqrt_dt = np.sqrt(dt)
+        u = np.exp(sigma * sqrt_dt)
+        d = 1.0 / u
+        p = (np.exp((r - q) * dt) - d) / (u - d)
+        disc = np.exp(-r * dt)
+
+        # Build stock grid: level i has i+1 nodes with k up moves (k=0..i)
+        stock_levels: List[List[float]] = []
+        for i in range(N + 1):
+            level = []
+            for k in range(0, i + 1):
+                S_it = S * (u**k) * (d ** (i - k))
+                level.append(float(S_it))
+            stock_levels.append(level)
+
+        # Terminal option values (European/American identical at maturity)
+        levels_option_eu: List[List[float]] = []
+        terminal = []
+        for S_T in stock_levels[-1]:
+            if option_type == "put":
+                terminal.append(float(max(K - S_T, 0.0)))
+            else:
+                terminal.append(float(max(S_T - K, 0.0)))
+        levels_option_eu.append(terminal)
+
+        # Backward induction for European values
+        for i in range(N - 1, -1, -1):
+            next_level = levels_option_eu[0]
+            curr = []
+            for k in range(0, i + 1):
+                cont = disc * (p * next_level[k + 1] + (1.0 - p) * next_level[k])
+                curr.append(float(cont))
+            levels_option_eu.insert(0, curr)
+
+        # For American values compute separately and capture early-exercise flags
+        levels_option_am: List[List[float]] = []
+        levels_early: List[List[bool]] = []
+        # start from terminal
+        levels_option_am.append(terminal.copy())
+        levels_early.append([False for _ in terminal])
+
+        for i in range(N - 1, -1, -1):
+            next_level = levels_option_am[0]
+            curr_vals = []
+            curr_early = []
+            for k in range(0, i + 1):
+                cont = disc * (p * next_level[k + 1] + (1.0 - p) * next_level[k])
+                S_it = stock_levels[i][k]
+                if option_type == "put":
+                    intrinsic = float(max(K - S_it, 0.0))
+                else:
+                    intrinsic = float(max(S_it - K, 0.0))
+                if intrinsic >= cont - 1e-10 and intrinsic > 0.0:
+                    val = intrinsic
+                    early = True
+                else:
+                    val = cont
+                    early = False
+                curr_vals.append(float(val))
+                curr_early.append(bool(early))
+            levels_option_am.insert(0, curr_vals)
+            levels_early.insert(0, curr_early)
+
+        # Assemble node dicts per level
+        levels_nodes: List[List[dict]] = []
+        for i in range(N + 1):
+            level_nodes = []
+            for k in range(0, i + 1):
+                node = {
+                    "stock": float(stock_levels[i][k]),
+                    "european": float(levels_option_eu[i][k]),
+                    "american": float(levels_option_am[i][k]),
+                    "early": bool(levels_early[i][k]),
+                }
+                level_nodes.append(node)
+            levels_nodes.append(level_nodes)
+
+        return {"N": N, "levels": levels_nodes}
+
+    @staticmethod
+    def build_trinomial_lattice(
+        S: float,
+        K: float,
+        T: float,
+        r: float,
+        sigma: float,
+        N: int,
+        q: float = 0.0,
+        option_type: str = "put",
+    ) -> dict:
+        """Build a Boyle-style trinomial lattice returning per-node stock, option (EU & AM) and early flags.
+
+        Node indexing: at level i nodes k in [-i..i], stock = S * u**k.
+        Returns same shape as build_binomial_lattice.
+        """
+        OptionPricingService._validate_inputs(S, K, T, r, sigma, q, N)
+
+        if T == 0:
+            intrinsic = max(K - S, 0.0) if option_type == "put" else max(S - K, 0.0)
+            node = {
+                "stock": float(S),
+                "european": float(intrinsic),
+                "american": float(intrinsic),
+                "early": bool(intrinsic > 0.0),
+            }
+            return {"N": N, "levels": [[node]]}
+
+        dt = T / N
+        u = np.exp(sigma * np.sqrt(2.0 * dt))
+        d = 1.0 / u
+
+        a = np.exp((r - q) * dt / 2.0)
+        b = np.exp(sigma * np.sqrt(dt / 2.0))
+        invb = 1.0 / b
+        denom = b - invb
+        pu = ((a - invb) / denom) ** 2
+        pd = ((b - a) / denom) ** 2
+        pm = 1.0 - pu - pd
+        disc = np.exp(-r * dt)
+
+        # Build stock grid
+        stock_levels: List[List[float]] = []
+        for i in range(N + 1):
+            level = []
+            for k in range(-i, i + 1):
+                level.append(float(S * (u**k)))
+            stock_levels.append(level)
+
+        # Terminal option values
+        if option_type == "put":
+            terminal = [float(max(K - S_T, 0.0)) for S_T in stock_levels[-1]]
+        else:
+            terminal = [float(max(S_T - K, 0.0)) for S_T in stock_levels[-1]]
+
+        # European values
+        levels_option_eu: List[List[float]] = [terminal.copy()]
+        for step in range(N - 1, -1, -1):
+            next_level = levels_option_eu[0]
+            curr = []
+            offset = step + 1
+            for k in range(-step, step + 1):
+                idx_down = (k - 1) + offset
+                idx_mid = k + offset
+                idx_up = (k + 1) + offset
+                cont = disc * (
+                    pd * next_level[idx_down]
+                    + pm * next_level[idx_mid]
+                    + pu * next_level[idx_up]
+                )
+                curr.append(float(cont))
+            levels_option_eu.insert(0, curr)
+
+        # American values and early flags
+        levels_option_am: List[List[float]] = [terminal.copy()]
+        levels_early: List[List[bool]] = [[False for _ in terminal]]
+        for step in range(N - 1, -1, -1):
+            next_level = levels_option_am[0]
+            curr_vals = []
+            curr_early = []
+            offset = step + 1
+            for k in range(-step, step + 1):
+                idx_down = (k - 1) + offset
+                idx_mid = k + offset
+                idx_up = (k + 1) + offset
+                cont = disc * (
+                    pd * next_level[idx_down]
+                    + pm * next_level[idx_mid]
+                    + pu * next_level[idx_up]
+                )
+                S_it = stock_levels[step][k + step]
+                if option_type == "put":
+                    intrinsic = float(max(K - S_it, 0.0))
+                else:
+                    intrinsic = float(max(S_it - K, 0.0))
+                if intrinsic >= cont - 1e-10 and intrinsic > 0.0:
+                    val = intrinsic
+                    early = True
+                else:
+                    val = cont
+                    early = False
+                curr_vals.append(float(val))
+                curr_early.append(bool(early))
+            levels_option_am.insert(0, curr_vals)
+            levels_early.insert(0, curr_early)
+
+        # Assemble nodes
+        levels_nodes: List[List[dict]] = []
+        for i in range(N + 1):
+            level_nodes = []
+            # stock_levels[i] has nodes for k in [-i..i]
+            for idx, S_it in enumerate(stock_levels[i]):
+                node = {
+                    "stock": float(S_it),
+                    "european": float(levels_option_eu[i][idx]),
+                    "american": float(levels_option_am[i][idx]),
+                    "early": bool(levels_early[i][idx]),
+                }
+                level_nodes.append(node)
+            levels_nodes.append(level_nodes)
+
+        return {"N": N, "levels": levels_nodes}
 
     # -------------------- Early Exercise Boundary --------------------
 
@@ -406,10 +640,11 @@ class OptionPricingService:
             disc = np.exp(-r * dt)
 
             # Build tree and find boundary
-            # Terminal payoffs
+            # Terminal payoffs: node k ∈ [-N, ..., N], index i = k + N
             vals = np.zeros(2 * N + 1)
             for i in range(2 * N + 1):
-                S_T = S * (u ** (N - i))
+                k = i - N  # net up moves
+                S_T = S * (u**k)
                 if option_type == "call":
                     vals[i] = max(S_T - K, 0.0)
                 else:
@@ -423,10 +658,13 @@ class OptionPricingService:
                 critical_price = None
 
                 for i in range(2 * step + 1):
-                    S_it = S * (u ** (step - i))
+                    k = i - step  # net up moves at this step
+                    S_it = S * (u**k)
 
                     # Continuation value
-                    cont = disc * (pu * vals[i] + pm * vals[i + 1] + pd * vals[i + 2])
+                    # Current node (k) connects to: k-1 (down), k (mid), k+1 (up)
+                    # In vals array: indices are i, i+1, i+2 (shifted by offset)
+                    cont = disc * (pd * vals[i] + pm * vals[i + 1] + pu * vals[i + 2])
 
                     # Intrinsic value
                     if option_type == "call":
@@ -509,6 +747,19 @@ class OptionPricingService:
             S, K, T, r, sigma, N, q, "call", "trinomial"
         )
 
+        # Prepare plot-ready trees: if N > 6 show trees for N_plot=6, else use N
+        N_plot = 6 if N > 6 else N
+        bino_tree_put = cls.build_binomial_lattice(S, K, T, r, sigma, N_plot, q, "put")
+        trino_tree_put = cls.build_trinomial_lattice(
+            S, K, T, r, sigma, N_plot, q, "put"
+        )
+        bino_tree_call = cls.build_binomial_lattice(
+            S, K, T, r, sigma, N_plot, q, "call"
+        )
+        trino_tree_call = cls.build_trinomial_lattice(
+            S, K, T, r, sigma, N_plot, q, "call"
+        )
+
         return {
             "black_scholes": {
                 "call_price": float(bs_call),
@@ -523,6 +774,16 @@ class OptionPricingService:
                 "convergence": bino_conv,
                 "boundary_put": bino_boundary_put,
                 "boundary_call": bino_boundary_call,
+            },
+            "trees": {
+                "put": {
+                    "binomial": bino_tree_put,
+                    "trinomial": trino_tree_put,
+                },
+                "call": {
+                    "binomial": bino_tree_call,
+                    "trinomial": trino_tree_call,
+                },
             },
             "trinomial": {
                 "european_call": float(trino_eu_c),

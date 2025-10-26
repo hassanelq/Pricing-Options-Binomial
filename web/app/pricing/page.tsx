@@ -27,6 +27,14 @@ const CallEarlyExercisePlot = dynamic(
   { ssr: false }
 );
 
+const TreeVisualization = dynamic(
+  () =>
+    import("@/components/pricing/TreeVisualization").then(
+      (mod) => mod.TreeVisualization
+    ),
+  { ssr: false }
+);
+
 export default function PricingPage() {
   const [form, setForm] = useState({
     s0: 90,
@@ -35,7 +43,7 @@ export default function PricingPage() {
     r: 0.03,
     sigma: 0.4,
     steps: 50,
-    q: 0.01,
+    q: 0.015,
   });
 
   const { loading, results, calculateAll } = usePricingCalculations();
@@ -350,11 +358,14 @@ export default function PricingPage() {
           />
         )}
 
-        {results.binomial && results.trinomial && results.blackScholes && (
-          <ConvergenceTestSection
-            bsPrice={results.blackScholes.callPrice}
-            binomialConvergence={results.binomial.convergence}
-            trinomialConvergence={results.trinomial.convergence}
+        {/* Tree Visualizations - American Put */}
+        {results.trees && (
+          <TreeVisualization
+            binomialTree={results.trees.put.binomial}
+            trinomialTree={results.trees.put.trinomial}
+            strikePrice={form.k}
+            exerciseType="american"
+            optionType="put"
           />
         )}
 
@@ -368,6 +379,17 @@ export default function PricingPage() {
           />
         )}
 
+        {/* Tree Visualizations - American Call */}
+        {results.trees && (
+          <TreeVisualization
+            binomialTree={results.trees.call.binomial}
+            trinomialTree={results.trees.call.trinomial}
+            strikePrice={form.k}
+            exerciseType="american"
+            optionType="call"
+          />
+        )}
+
         {/* Call Early Exercise Boundary - Only shown when dividends > 0 */}
         {results.binomial && results.trinomial && form.q > 0 && (
           <CallEarlyExercisePlot
@@ -375,6 +397,14 @@ export default function PricingPage() {
             trinomialBoundary={results.trinomial.boundaryCall}
             strikePrice={form.k}
             spotPrice={form.s0}
+          />
+        )}
+
+        {results.binomial && results.trinomial && results.blackScholes && (
+          <ConvergenceTestSection
+            bsPrice={results.blackScholes.callPrice}
+            binomialConvergence={results.binomial.convergence}
+            trinomialConvergence={results.trinomial.convergence}
           />
         )}
 

@@ -36,6 +36,18 @@ interface BoundaryPoint {
   time_to_maturity: number;
 }
 
+interface TreeNode {
+  stock: number;
+  european: number;
+  american: number;
+  early: boolean;
+}
+
+interface TreeLattice {
+  N: number;
+  levels: TreeNode[][];
+}
+
 interface ApiResponse {
   black_scholes: {
     call_price: number;
@@ -59,6 +71,16 @@ interface ApiResponse {
     convergence: Array<{ steps: number; price: number }>;
     boundary_put: BoundaryPoint[];
     boundary_call: BoundaryPoint[];
+  };
+  trees: {
+    put: {
+      binomial: TreeLattice;
+      trinomial: TreeLattice;
+    };
+    call: {
+      binomial: TreeLattice;
+      trinomial: TreeLattice;
+    };
   };
   validation: ValidationResults;
 }
@@ -88,6 +110,16 @@ interface Results {
     boundaryPut: BoundaryPoint[];
     boundaryCall: BoundaryPoint[];
   } | null;
+  trees: {
+    put: {
+      binomial: TreeLattice;
+      trinomial: TreeLattice;
+    };
+    call: {
+      binomial: TreeLattice;
+      trinomial: TreeLattice;
+    };
+  } | null;
   validation: ValidationResults | null;
 }export function usePricingCalculations() {
   const [loading, setLoading] = useState(false);
@@ -95,6 +127,7 @@ interface Results {
     blackScholes: null,
     binomial: null,
     trinomial: null,
+    trees: null,
     validation: null,
   });
 
@@ -108,7 +141,7 @@ interface Results {
     q: number;
   }) => {
     setLoading(true);
-    setResults({ blackScholes: null, binomial: null, trinomial: null, validation: null });
+    setResults({ blackScholes: null, binomial: null, trinomial: null, trees: null, validation: null });
 
     try {
       const response = await apiPost<ApiResponse>('/api/calculate', {
@@ -177,6 +210,7 @@ interface Results {
           boundaryPut: response.trinomial.boundary_put,
           boundaryCall: response.trinomial.boundary_call,
         },
+        trees: response.trees,
         validation: response.validation,
       });
     } catch (error: any) {
