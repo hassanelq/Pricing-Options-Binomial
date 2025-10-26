@@ -4,10 +4,10 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import * as XLSX from "xlsx";
 import InputForm from "@/components/pricing/InputForm";
-import BlackScholesSection from "@/components/pricing/BlackScholesSection";
-import TreeModelSection from "@/components/pricing/TreeModelSection";
+import { EnhancedPricingResults } from "@/components/pricing/EnhancedPricingResults";
 import ConvergenceTestSection from "@/components/pricing/ConvergenceTestSection";
 import ValidationSection from "@/components/pricing/ValidationSection";
+import { OptionsFetcher } from "@/components/pricing/OptionsFetcher";
 import { usePricingCalculations } from "../../hooks/usePricingCalculations";
 
 // Dynamically import plot components to avoid SSR issues
@@ -318,6 +318,19 @@ export default function PricingPage() {
           </p>
         </div>
 
+        <OptionsFetcher
+          onOptionSelect={(optionData) => {
+            setForm({
+              ...form,
+              s0: optionData.s0,
+              k: optionData.k,
+              t: optionData.t,
+              sigma: optionData.sigma,
+              r: optionData.r,
+            });
+          }}
+        />
+
         <InputForm
           form={form}
           setForm={setForm}
@@ -327,34 +340,11 @@ export default function PricingPage() {
           hasResults={!!results.blackScholes}
         />
 
-        {results.blackScholes && (
-          <BlackScholesSection
-            callPrice={results.blackScholes.callPrice}
-            putPrice={results.blackScholes.putPrice}
-            callGreeks={results.blackScholes.callGreeks}
-            putGreeks={results.blackScholes.putGreeks}
-          />
-        )}
-
-        {results.binomial && (
-          <TreeModelSection
-            title="Binomial Tree Model"
-            europeanCall={results.binomial.europeanCall}
-            europeanPut={results.binomial.europeanPut}
-            americanCall={results.binomial.americanCall}
-            americanPut={results.binomial.americanPut}
-            bsPrice={results.blackScholes?.callPrice || 0}
-          />
-        )}
-
-        {results.trinomial && (
-          <TreeModelSection
-            title="Trinomial Tree Model"
-            europeanCall={results.trinomial.europeanCall}
-            europeanPut={results.trinomial.europeanPut}
-            americanCall={results.trinomial.americanCall}
-            americanPut={results.trinomial.americanPut}
-            bsPrice={results.blackScholes?.callPrice || 0}
+        {results.blackScholes && results.binomial && results.trinomial && (
+          <EnhancedPricingResults
+            blackScholes={results.blackScholes}
+            binomial={results.binomial}
+            trinomial={results.trinomial}
           />
         )}
 

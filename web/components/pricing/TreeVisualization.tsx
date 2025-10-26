@@ -227,7 +227,7 @@ export function TreeVisualization({
       {/* Header Section */}
       <div className="border-b-2 border-gray-200 dark:border-gray-700 pb-6">
         <h2 className="text-3xl font-bold mb-3 text-gray-900 dark:text-white bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-          Option Pricing Tree
+          {optionType === "put" ? "Put" : "Call"} Pricing Tree
         </h2>
         <div className="flex flex-wrap gap-4 items-center text-sm">
           <div className="flex items-center gap-2">
