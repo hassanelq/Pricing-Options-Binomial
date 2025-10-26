@@ -41,8 +41,8 @@ export function TreeVisualization({
     const sizes: number[] = [];
 
     // Lines data for connections
-    const lineX: number[] = [];
-    const lineY: number[] = [];
+    const lineX: (number | null)[] = [];
+    const lineY: (number | null)[] = [];
 
     // Store node positions for line drawing
     const nodePosMap: Map<string, { x: number; y: number }> = new Map();
