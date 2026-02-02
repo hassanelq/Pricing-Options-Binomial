@@ -1,0 +1,177 @@
+% ====================================================================
+% PREAMBLE.TEX - Configuration for Heston Model Calibration Presentation
+% ====================================================================
+
+% Essential packages
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{enumitem} 
+\usepackage[utf8]{inputenc}	
+\usepackage[french]{babel}
+\usepackage{caption}
+\usepackage{helvet}
+\usepackage{tikz}
+\usepackage{amsmath}
+\usepackage{fontawesome5}
+\usepackage{adjustbox}
+\usepackage{tikz}
+\usepackage{booktabs}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.16}
+\usetikzlibrary{positioning, shapes, arrows, calc, decorations.pathreplacing, arrows.meta, backgrounds, patterns, overlay-beamer-styles}
+\usepackage{etoolbox}
+\usepackage{animate}
+\usepgfplotslibrary{dateplot}
+
+\usepackage{calligra}
+% Font configuration
+\renewcommand{\familydefault}{\sfdefault}
+\usefonttheme{professionalfonts}
+
+% Theme selection
+\usetheme{CambridgeUS}
+\setbeamertemplate{navigation symbols}{}
+
+% ====================================================================
+% COLOR DEFINITIONS
+% ====================================================================
+\definecolor{darkGreen}{HTML}{004120} 
+
+% ====================================================================
+% BEAMER COLOR CONFIGURATION
+% ====================================================================
+% Main structure colors
+\setbeamercolor*{structure}{bg=darkGreen, fg=black}
+\setbeamercolor*{palette primary}{fg=white, bg=darkGreen!70!black}
+\setbeamercolor*{palette secondary}{fg=white, bg=darkGreen!80!white}
+\setbeamercolor*{palette tertiary}{fg=white, bg=darkGreen!70!black}
+\setbeamercolor*{palette quaternary}{fg=white, bg=black}
+
+% Section and content colors
+\setbeamercolor{section in toc}{fg=darkGreen, bg=white}
+\setbeamercolor{alerted text}{fg=darkGreen}
+\setbeamercolor*{item}{fg=darkGreen}
+
+% Block colors
+\setbeamercolor{block title}{bg=darkGreen, fg=white}
+\setbeamercolor{block body}{bg=darkGreen!10!white, fg=black}
+
+% Title and frame colors
+\setbeamercolor{titlelike}{fg=white, bg=darkGreen}
+\setbeamercolor{frametitle}{bg=darkGreen!10!white, fg=darkGreen}
+
+% Bibliography colors
+\setbeamercolor{bibliography entry author}{fg=black}
+
+% ====================================================================
+% BEAMER TEMPLATE CUSTOMIZATION
+% ====================================================================
+% Caption settings
+\setbeamertemplate{caption}[numbered]
+\captionsetup[figure]{labelformat=simple, labelsep=endash, textformat=period, font=footnotesize}
+\captionsetup[table]{labelformat=simple, labelsep=endash, textformat=period, font=footnotesize}
+\captionsetup[figure]{aboveskip=2pt, belowskip=0pt}
+\captionsetup[table]{aboveskip=2pt, belowskip=0pt}
+
+% Remove rounded corners from blocks
+\makeatletter
+\setbeamertemplate{blocks}[default]
+\makeatother
+
+
+% Frame continuation template
+\setbeamertemplate{frametitle continuation}{}
+
+% List customization - fix recursive definition
+\setbeamertemplate{itemize item}{\textcolor{darkGreen}{\rule{1ex}{1ex}}}
+
+% Table of contents customization
+\setbeamertemplate{section in toc}[sections numbered]
+\setbeamertemplate{section in toc}{\textbullet\quad\inserttocsection}
+\setcounter{secnumdepth}{0}
+
+% Text margins
+\setbeamersize{text margin left=0.8cm, text margin right=0.8cm}
+
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning}
+
+\tikzstyle{type} = [rectangle, rounded corners, draw=blue!60, fill=blue!10, very thick, minimum height=1.2cm, text centered]
+\tikzstyle{desc} = [rectangle, draw=gray!50, fill=gray!10, minimum width=3.5cm, minimum height=1cm, text centered]
+\usepackage{tikz}
+\newcommand{\coloredbullet}{\tikz \draw [ball color=green!50!blue] (0,0) circle (0.3ex);}
+% ====================================================================
+% CUSTOM TITLE PAGE TEMPLATE
+% ====================================================================
+% Define advisor name command
+\newcommand{\advisor}[1]{\def\advisorname{#1}}
+\newcommand{\advisorname}{}
+
+\setbeamertemplate{title page}{
+    \vbox{}
+    \vspace{0.5cm}
+    
+    \begin{center}
+      \includegraphics[width=0.4\linewidth]{img/IbnZhohrLogo1.png}
+    \end{center}
+
+    % \vskip1em\par
+    \begingroup
+        \vspace{0.6cm}
+        % \begin{center}
+        %     \usebeamerfont{author}Projet de fin d'année\par
+        % \end{center}
+        \centering
+        \begin{beamercolorbox}[sep=8pt,center,shadow=true,rounded=false]{title}
+            \usebeamerfont{title}\inserttitle\par%
+            \vskip0.25em%
+            {\usebeamerfont{subtitle}\usebeamercolor[fg]{subtitle}\insertsubtitle\par}%
+            % \vskip0.1em%
+        \end{beamercolorbox}%
+        \vspace{0.2cm}
+        {\usebeamerfont{institute}\insertdate\par}
+        \vspace{0.3cm}
+        \begin{beamercolorbox}[sep=6pt,center]{author}
+         \usebeamerfont{author} Finance et Ingénierie Décisionnelle \vskip0.3em\par
+         \usebeamerfont{institute}\insertinstitute
+        \end{beamercolorbox}
+    \endgroup
+    \vfill
+}
+
+% ====================================================================
+% FOOTER TEMPLATE
+% ====================================================================
+\setbeamertemplate{footline}{
+  \leavevmode%
+  \hbox{%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,left]{author in head/foot}%
+      \hspace{1em}\textbf{Finance et Ingénierie Décisionnelle}
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.34\paperwidth,ht=2.5ex,dp=1ex,center]{title in head/foot}%
+      \usebeamerfont{title in head/foot}\insertshorttitle
+    \end{beamercolorbox}%
+    \begin{beamercolorbox}[wd=.33\paperwidth,ht=2.5ex,dp=1ex,right]{date in head/foot}%
+      \insertframenumber{} / \inserttotalframenumber\hspace{1em}
+    \end{beamercolorbox}}%
+  \vskip0pt%
+}
+
+% ====================================================================
+% TEXT FORMATTING SETTINGS
+% ====================================================================
+% Hyphenation settings
+\hyphenpenalty=10000
+\tolerance=10000
+
+% Section numbering customization
+\renewcommand{\thesection}{\textcolor{darkGreen}{\arabic{section}}}
+\renewcommand{\thesubsection}{\textcolor{darkGreen}{\arabic{section}.\arabic{subsection}}}
+
+
+\usepackage{enumitem}
+\setlist[enumerate,1]{label=\arabic*., nosep}

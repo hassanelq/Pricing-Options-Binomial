@@ -1,0 +1,15 @@
+\babel@toc {french}{}\relax 
+\beamer@sectionintoc {1}{Introduction}{3}{0}{1}
+\beamer@subsectionintoc {1}{1}{Contexte général}{3}{0}{1}
+\beamer@subsectionintoc {1}{2}{Objectifs du projet}{4}{0}{1}
+\beamer@sectionintoc {2}{Évaluation et Couverture}{5}{0}{2}
+\beamer@subsectionintoc {2}{1}{L'essentiel sur les options}{5}{0}{2}
+\beamer@subsectionintoc {2}{2}{Duplication de Portefeuille}{8}{0}{2}
+\beamer@sectionintoc {3}{Applications des Modèles}{11}{0}{3}
+\beamer@subsectionintoc {3}{1}{Modèle Binomial à Une Période}{11}{0}{3}
+\beamer@subsectionintoc {3}{2}{Modèle de Cox-Ross-Rubinstein (CRR)}{12}{0}{3}
+\beamer@subsectionintoc {3}{3}{Modèle Trinomial (Boyle)}{14}{0}{3}
+\beamer@subsectionintoc {3}{4}{Le Modèle de Black-Scholes}{16}{0}{3}
+\beamer@sectionintoc {4}{Validation et Comparaison}{18}{0}{4}
+\beamer@sectionintoc {5}{Interface et Implémentation}{21}{0}{5}
+\beamer@sectionintoc {6}{Conclusion et Perspectives}{24}{0}{6}

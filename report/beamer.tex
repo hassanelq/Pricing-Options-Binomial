@@ -1,0 +1,808 @@
+\documentclass[aspectratio=169]{beamer}
+
+% ================== THEME & PACKAGES ==================
+\usetheme[numbering=fraction, progressbar=foot]{metropolis}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{amsmath, amssymb, mathtools}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta, positioning, calc, trees, shapes.geometric}
+\usepackage{graphicx}
+\usepackage{pgfplots}
+\usepackage{tcolorbox}
+\pgfplotsset{compat=1.17}
+
+% ================== COLORS ==================
+\definecolor{Primary}{RGB}{26,82,118}
+\definecolor{Secondary}{RGB}{0,150,136}
+\definecolor{Accent}{RGB}{45, 62, 80}
+\definecolor{LightGray}{RGB}{245,245,245}
+
+\setbeamercolor{frametitle}{fg=white, bg=Secondary}
+\setbeamercolor{title}{fg=Primary}
+\setbeamercolor{progress bar}{fg=Secondary, bg=Secondary!25}
+\setbeamercolor{alerted text}{fg=Accent}
+\setbeamercolor{structure}{fg=Primary}
+\setbeamercolor{block title}{bg=Primary!90, fg=white}
+\setbeamercolor{block body}{bg=Primary!10}
+
+% ================== BOXES ==================
+\newtcolorbox{keybox}[1]{
+  colback=Secondary!5,
+  colframe=Secondary!80,
+  fonttitle=\bfseries\small,
+  title=#1,
+  boxrule=1.2pt,
+  arc=2pt,
+  left=3pt,
+  right=3pt,
+  top=3pt,
+  bottom=3pt
+}
+\newtcolorbox{formulabox}{
+  colback=LightGray,
+  colframe=Primary,
+  boxrule=0.8pt,
+  arc=2pt,
+  left=4pt,
+  right=4pt,
+  top=4pt,
+  bottom=4pt
+}
+
+% ================== FONTS ==================
+\setbeamerfont{frametitle}{size=\large}
+\setbeamerfont{block title}{size=\small}
+
+% ================== TITLE ==================
+\title{\textbf{Modélisation et Valorisation d'Options}}
+\subtitle{Black--Scholes • Binomial (CRR) • Trinomial (Boyle) • Américaines}
+\author{Hassan EL QADI}
+\institute{ENSA Agadir --- Finance \& Ingénierie de la Décision\\Encadré par M. Brahim El Asri}
+\date{Octobre 2025}
+
+% ================== SHORTCUTS ==================
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Q}{\mathbb{Q}}
+
+\begin{document}
+
+% ===== SLIDE 1: TITLE =====
+\begin{frame}[plain]
+  \titlepage
+  \vspace{-8mm}
+  \begin{center}\scriptsize
+    Démo interactive : \href{https://options-binomial.vercel.app/pricing}{\textcolor{Secondary}{\textbf{options-binomial.vercel.app}}}
+  \end{center}
+\end{frame}
+
+% ===== SLIDE 2: PLAN =====
+\begin{frame}{Plan}
+  \setbeamertemplate{section in toc}[sections numbered]
+  \tableofcontents
+\end{frame}
+
+% ================== SECTION 1: INTRODUCTION ==================
+\section{Introduction}
+
+% ===== SLIDE 3: CONTEXTE, PROBLÉMATIQUE, OBJECTIFS =====
+\begin{frame}{Contexte, Problématique et Objectifs}
+  \small
+  
+  \textbf{Contexte}
+  \begin{itemize}\scriptsize
+    \item Les marchés dérivés jouent un rôle clé dans la gestion du risque, la spéculation et la couverture
+  \end{itemize}
+
+  \textbf{Problématique}
+  \begin{itemize}\scriptsize
+    \item Comment obtenir des \emph{prix justes} et des \emph{décisions d'exercice} robustes pour les options européennes et américaines ?
+    \item Nécessité de méthodes rapides, stables et précises
+  \end{itemize}
+
+  \textbf{Objectifs}
+  \begin{itemize}\scriptsize
+    \item Implémenter BSM (benchmark), CRR (binomial) et Boyle (trinomial)
+    \item Traiter l'\textbf{exercice anticipé} et calculer la frontière $S^*(t)$
+    \item Valider via convergence, parité put-call et conditions de non-arbitrage
+  \end{itemize}
+\end{frame}
+
+% ================== SECTION 2: RAPPELS ==================
+\section{Rappels théoriques}
+
+% ===== SLIDE 4: RAPPELS (1/2) =====
+\begin{frame}{Définitions essentielles}
+  \small
+  
+   \begin{columns}[T]
+     \begin{column}{0.4\textwidth}
+  \textbf{Paramètres de marché}
+  \begin{itemize}\scriptsize
+    \item $S_0$ : prix spot de l'actif sous-jacent
+    \item $K$ : strike (prix d'exercice)
+    \item $T$ : maturité (en années)
+    \item $r$ : taux sans risque
+    \item $q$ : taux de dividende continu
+    \item $\sigma$ : volatilité
+  \end{itemize}
+  \end{column}
+    \begin{column}{0.50\textwidth}
+    \textbf{Payoffs}
+  \begin{itemize}\scriptsize
+    \item Call : $(S_T - K)^+$
+    \item Put : $(K - S_T)^+$
+  \end{itemize}
+  \end{column}
+
+  \end{columns}
+
+
+  \vspace{2mm}
+  \begin{keybox}{Mesure risque-neutre $\Q$}
+    \scriptsize
+    Sous la mesure risque-neutre : 
+    $\E_\Q\!\left[\dfrac{S_{t+\Delta t}}{S_t}\right] = e^{(r-q)\Delta t}$
+  \end{keybox}
+\end{frame}
+
+% ===== SLIDE 5: RAPPELS (2/2) =====
+\begin{frame}{Parité et options américaines}
+  \small
+  
+  \begin{formulabox}\scriptsize
+    \textbf{Parité put-call européenne :}
+    \vspace{1mm}
+    
+    $C - P = S_0e^{-qT} - Ke^{-rT}$
+  \end{formulabox}
+  
+  \vspace{3mm}
+  \begin{keybox}{Options américaines}
+    \scriptsize
+    \textbf{Principe :} À chaque nœud de l'arbre, on compare :
+    \begin{itemize}\scriptsize
+      \item Valeur intrinsèque (exercice immédiat)
+      \item Valeur de continuation (attendre)
+    \end{itemize}
+    
+    $V = \max(\text{intrinsèque}, \text{continuation})$
+    
+    \vspace{2mm}
+    \textbf{Comportement :}
+    \begin{itemize}\scriptsize
+      \item \emph{Put américain} : exercice optimal quand $S$ est suffisamment bas
+      \item \emph{Call américain} : exercice anticipé seulement avec dividendes importants
+    \end{itemize}
+  \end{keybox}
+\end{frame}
+
+% ================== SECTION 3: MODÈLES ==================
+\section{Modèles de valorisation}
+
+% ===== SLIDE 6: BLACK-SCHOLES-MERTON =====
+\begin{frame}{Black--Scholes--Merton (Benchmark)}
+  \small
+  
+  \begin{formulabox}\scriptsize
+    \textbf{Prix d'un call européen :}
+    
+    $C = S_0e^{-qT}N(d_1) - Ke^{-rT}N(d_2)$
+    
+    \vspace{2mm}
+    \textbf{Prix d'un put européen :}
+    
+    $P = Ke^{-rT}N(-d_2) - S_0e^{-qT}N(-d_1)$
+    
+    \vspace{2mm}
+    où :
+    
+    $d_1 = \dfrac{\ln(S_0/K) + (r - q + \frac{1}{2}\sigma^2)T}{\sigma\sqrt{T}}$
+    
+    $d_2 = d_1 - \sigma\sqrt{T}$
+  \end{formulabox}
+  
+  \vspace{3mm}
+  \textbf{Pourquoi l'utiliser ?}
+  \begin{itemize}\scriptsize
+    \item Solution analytique fermée (calcul instantané)
+    \item Calcul exact des grecques (Delta, Gamma, Vega, etc.)
+    \item Sert de \textbf{référence} pour valider les méthodes numériques
+    \item Largement utilisé par les praticiens
+  \end{itemize}
+\end{frame}
+
+% ===== SLIDE 7: CRR BINOMIAL =====
+% ===== SLIDE 7A: BINOMIAL PARAMETERS =====
+\begin{frame}{Modèle binomial CRR — Paramètres}
+  \small
+  \textbf{Paramètres du modèle}
+  \begin{formulabox}\scriptsize
+    $\Delta t = \dfrac{T}{N}$ \quad (pas de temps)
+    
+    $u = e^{\sigma\sqrt{\Delta t}}$ \quad (facteur de hausse)
+    
+    $d = \dfrac{1}{u} = e^{-\sigma\sqrt{\Delta t}}$ \quad (facteur de baisse)
+    
+    $p = \dfrac{e^{(r-q)\Delta t} - d}{u - d}$ \quad (probabilité risque-neutre)
+    
+    $\text{disc} = e^{-r\Delta t}$ \quad (facteur d’actualisation)
+    
+    \vspace{1mm}
+    Prix du sous-jacent au nœud $(i,j)$ :
+    \[
+      S_{i,j} = S_0 \cdot u^j \cdot d^{i-j}
+    \]
+  \end{formulabox}
+\end{frame}
+
+
+
+% ===== SLIDE 7B: BINOMIAL ALGORITHM =====
+\begin{frame}{Modèle binomial CRR — Algorithme}
+  \small
+  \textbf{Étapes de calcul (Backward Induction)}
+  \begin{enumerate}\scriptsize
+    \item \textbf{Initialisation (maturité)} :\\
+    Pour tous les nœuds $j$ à $i = N$, calculer :
+    \[
+      V_{N,j} = \text{payoff}(S_{N,j})
+    \]
+    Exemple : pour un call, $V_{N,j} = \max(S_{N,j} - K, 0)$.
+    
+    \vspace{2mm}
+    \item \textbf{Rétropropagation (valeurs précédentes)} :\\
+    Pour chaque $i = N-1, N-2, \ldots, 0$ et chaque $j \in [0, i]$ :
+    \[
+      C_{i,j} = \text{disc} \cdot [p \cdot V_{i+1,j+1} + (1-p) \cdot V_{i+1,j}]
+    \]
+    
+    \vspace{2mm}
+    \item \textbf{Condition selon le type d’option :}
+    \begin{itemize}
+      \item \textbf{Européenne :} $V_{i,j} = C_{i,j}$
+      \item \textbf{Américaine :} $V_{i,j} = \max(\text{valeur intrinsèque}(S_{i,j}), C_{i,j})$
+    \end{itemize}
+    
+    \vspace{2mm}
+    \item \textbf{Prix initial :} $V_0 = V_{0,0}$
+  \end{enumerate}
+\end{frame}
+
+\begin{frame}{Modèle binomial CRR — Schéma de l'algorithme}
+  \small
+  \begin{center}
+    \begin{tikzpicture}[
+      scale=0.75,
+      node distance=2cm and 3cm,
+      price/.style={circle, draw=black!80, thick, minimum size=0.8cm, font=\tiny},
+      value/.style={rectangle, draw=green!70, fill=green!10, thick, minimum size=0.7cm, font=\tiny},
+      payoff/.style={rectangle, draw=red!70, fill=red!10, thick, minimum size=0.7cm, font=\tiny},
+      arrow/.style={->, >=stealth, thick},
+      label/.style={font=\tiny, text=black}
+    ]
+    
+    % Timeline
+    \draw[->, thick] (-0.6, -3.8) -- (6, -3.8);
+    \node[font=\tiny] at (0, -4) {$t=0$};
+    \node[font=\tiny] at (1.8, -4) {$t=\Delta t$};
+    \node[font=\tiny] at (4.2, -4) {$t=2\Delta t = T$};
+    
+    % Nodes at t=0
+    \node[price] (S0) at (0,0) {$S_0$};
+    \node[value, below=0.3cm of S0] (V0) {$V_{0,0}$};
+    
+    % Nodes at t=1
+    \node[price] (S11) at (2,1.3) {$S_{1,1}$};
+    \node[label, above=0.05cm of S11] {$S_0 u$};
+    \node[value, right=0.25cm of S11] (V11) {$V_{1,1}$};
+    
+    \node[price] (S10) at (2,-1.3) {$S_{1,0}$};
+    \node[label, below=0.05cm of S10] {$S_0 d$};
+    \node[value, right=0.25cm of S10] (V10) {$V_{1,0}$};
+    
+    % Nodes at t=2 (maturity)
+    \node[price] (S22) at (4.2,2.4) {$S_{2,2}$};
+    \node[label, above=0.05cm of S22] {$S_0 u^2$};
+    \node[payoff, right=0.25cm of S22] (P22) {$V_{2,2}$};
+    
+    \node[price] (S21) at (4.2,0) {$S_{2,1}$};
+    \node[label, right=0.05cm of S21, xshift=1cm] {$S_0 ud$};
+    \node[payoff, right=0.25cm of S21] (P21) {$V_{2,1}$};
+    
+    \node[price] (S20) at (4.2,-2.4) {$S_{2,0}$};
+    \node[label, below=0.05cm of S20] {$S_0 d^2$};
+    \node[payoff, right=0.25cm of S20] (P20) {$V_{2,0}$};
+    
+    % Price tree connections (gray)
+    \draw[gray, thick] (S0) -- (S11) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S0) -- (S10) node[midway, below left, font=\tiny] {$d$};
+    \draw[gray, thick] (S11) -- (S22) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S11) -- (S21) node[midway, below left, font=\tiny] {$d$};
+    \draw[gray, thick] (S10) -- (S21) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S10) -- (S20) node[midway, below left, font=\tiny] {$d$};
+    
+    % Backward induction arrows
+    % From t=2 to t=1
+    \draw[arrow, red!70, dashed] (P22) to[bend left=10] node[midway, above, font=\tiny] {$p$} (V11);
+    \draw[arrow, red!70, dashed] (P21) to[bend right=8] node[midway, below, font=\tiny] {$1-p$} (V11);
+    
+    \draw[arrow, red!70, dashed] (P21) to[bend left=8] node[midway, above, font=\tiny] {$p$} (V10);
+    \draw[arrow, red!70, dashed] (P20) to[bend right=10] node[midway, below, font=\tiny] {$1-p$} (V10);
+    
+    % From t=1 to t=0
+    \draw[arrow, green!70, very thick] (V11) to[bend right=15] node[midway, above left, font=\tiny] {$p$} (V0);
+    \draw[arrow, green!70, very thick] (V10) to[bend left=15] node[midway, below left, font=\tiny] {$1-p$} (V0);
+    
+    % Step labels (moved further right with more spacing)
+    \node[draw, fill=red!10, text width=3cm, align=left, font=\tiny, thick] at (12, 2.2) {
+      \textbf{Étape 1 :} \\[1mm]
+      Payoffs à maturité $T$ \\[0.5mm]
+      $V_{2,j} = \text{payoff}(S_{2,j})$ \\[0.5mm]
+      Ex: Call $\max(S_{2,j}-K, 0)$
+    };
+    
+    \node[draw, fill=orange!10, text width=4.5cm, align=left, font=\tiny, thick] at (12, 0) {
+      \textbf{Étape 2 :} \\[1mm]
+      Rétropropagation \\[0.5mm]
+      $C_{i,j} = e^{-r\Delta t}
+      \times [p \cdot V_{i+1,j+1}
+      + (1-p) \cdot V_{i+1,j}]$
+    };
+    
+    \node[draw, fill=green!10, text width=2.5cm, align=left, font=\tiny, thick] at (12, -2.2) {
+      \textbf{Étape 3 :} \\[1mm]
+      Prix initial de l'option \\[0.5mm]
+      $V_0 = V_{0,0}$ \\[0.5mm]
+      Résultat final
+    };
+    
+    \end{tikzpicture}
+  \end{center}
+  
+  \vspace{-3mm}
+  
+  \begin{formulabox}\scriptsize
+    \textbf{Condition selon le type :} \quad
+    Européenne : $V_{i,j} = C_{i,j}$ \quad | \quad
+    Américaine : $V_{i,j} = \max(\text{payoff}(S_{i,j}), C_{i,j})$
+  \end{formulabox}
+\end{frame}
+
+
+% ===== SLIDE 8A: TRINOMIAL PARAMETERS =====
+\begin{frame}{Modèle trinomial de Boyle — Paramètres}
+  \small
+  \textbf{Paramètres du modèle}
+  \begin{formulabox}\scriptsize
+    $u = e^{\sigma\sqrt{2\Delta t}}$, \quad $m = 1$, \quad $d = \dfrac{1}{u}$
+
+    $a = e^{(r-q)\Delta t/2}$, \quad $b = e^{\sigma\sqrt{\Delta t/2}}$
+
+    \vspace{1mm}
+    \textbf{Probabilités risque-neutres :}
+    \[
+      p_u = \left(\dfrac{a - b^{-1}}{b - b^{-1}}\right)^2, \quad
+      p_d = \left(\dfrac{b - a}{b - b^{-1}}\right)^2, \quad
+      p_m = 1 - p_u - p_d
+    \]
+    
+    \vspace{1mm}
+    Indexation centrée : \quad
+    $S_{i,k} = S_0 \cdot u^k$ \quad avec $k \in [-i, \ldots, i]$
+    
+    \vspace{1mm}
+    Facteur d’actualisation : \quad $\text{disc} = e^{-r\Delta t}$
+  \end{formulabox}
+\end{frame}
+
+% ===== SLIDE 8B: TRINOMIAL ALGORITHM =====
+\begin{frame}{Modèle trinomial de Boyle — Algorithme}
+  \small
+  \textbf{Étapes de calcul (Backward Induction)}
+  \begin{enumerate}\scriptsize
+    \item \textbf{Initialisation à maturité :}\\
+    Pour tous les $k \in [-N, N]$ :
+    \[
+      V_{N,k} = \text{payoff}(S_{N,k})
+    \]
+    Exemple : $V_{N,k} = \max(S_{N,k} - K, 0)$ pour un call.
+    
+    \vspace{2mm}
+    \item \textbf{Rétropropagation :}\\
+    Pour $i = N-1, N-2, \ldots, 0$ et $k \in [-i, i]$ :
+    \[
+      C_{i,k} = \text{disc} \cdot [p_u V_{i+1,k+1} + p_m V_{i+1,k} + p_d V_{i+1,k-1}]
+    \]
+    
+    \vspace{2mm}
+    \item \textbf{Condition selon le type d’option :}
+    \begin{itemize}
+      \item \textbf{Européenne :} $V_{i,k} = C_{i,k}$
+      \item \textbf{Américaine :} $V_{i,k} = \max(\text{intrinsèque}(S_{i,k}), C_{i,k})$
+    \end{itemize}
+    
+    \vspace{2mm}
+    \item \textbf{Prix initial :} $V_0 = V_{0,0}$
+  \end{enumerate}
+\end{frame}
+
+% ===== SLIDE: TRINOMIAL BOYLE SCHEMA =====
+\begin{frame}{Modèle trinomial de Boyle — Schéma de l'algorithme}
+  \small
+  
+  \begin{center}
+    \begin{tikzpicture}[
+      scale=0.65,
+      node distance=1.8cm and 2.5cm,
+      price/.style={circle, draw=black!80, thick, minimum size=0.65cm, font=\tiny},
+      value/.style={rectangle, draw=green!70, fill=green!10, thick, minimum size=0.6cm, font=\tiny},
+      payoff/.style={rectangle, draw=red!70, fill=red!10, thick, minimum size=0.6cm, font=\tiny},
+      arrow/.style={->, >=stealth, thick},
+      label/.style={font=\tiny, text=black}
+    ]
+    
+    % Timeline
+    \draw[->, thick] (-0.6, -4.5) -- (7, -4.5);
+    \node[font=\tiny] at (0, -4.75) {$t=0$};
+    \node[font=\tiny] at (3, -4.75) {$t=\Delta t$};
+    \node[font=\tiny] at (6.2, -4.75) {$t=2\Delta t = T$};
+    
+    % Nodes at t=0
+    \node[price] (S0) at (0,0) {$S_0$};
+    \node[value, below=0.25cm of S0] (V0) {$V_{0,0}$};
+    
+    % Nodes at t=1
+    \node[price] (S12) at (3,2) {$S_{1,2}$};
+    \node[label, above=0.05cm of S12] {$S_0 u$};
+    \node[value, right=0.4cm of S12] (V12) {$V_{1,2}$};
+    
+    \node[price] (S11) at (3,0) {$S_{1,1}$};
+    \node[label, right=0.05cm of S11, xshift=1.4cm] {$S_0$};
+    \node[value, right=0.4cm of S11] (V11) {$V_{1,1}$};
+    
+    \node[price] (S10) at (3,-2) {$S_{1,0}$};
+    \node[label, below=0.05cm of S10] {$S_0 d$};
+    \node[value, right=0.4cm of S10] (V10) {$V_{1,0}$};
+    
+    % Nodes at t=2 (maturity)
+    \node[price] (S24) at (6.2,3.2) {$S_{2,4}$};
+    \node[label, above=0.05cm of S24] {$S_0 u^2$};
+    \node[payoff, right=0.8cm of S24] (P24) {$V_{2,4}$};
+    
+    \node[price] (S23) at (6.2,1.6) {$S_{2,3}$};
+    \node[label, right=0.05cm of S23, xshift=1.4cm] {};
+    \node[payoff, right=0.8cm of S23] (P23) {$V_{2,3}$};
+    
+    \node[price] (S22) at (6.2,0) {$S_{2,2}$};
+    \node[label, right=0.05cm of S22, xshift=1.4cm] {};
+    \node[payoff, right=0.8cm of S22] (P22) {$V_{2,2}$};
+    
+    \node[price] (S21) at (6.2,-1.6) {$S_{2,1}$};
+    \node[label, right=0.05cm of S21, xshift=1.4cm] {};
+    \node[payoff, right=0.8cm of S21] (P21) {$V_{2,1}$};
+    
+    \node[price] (S20) at (6.2,-3.2) {$S_{2,0}$};
+    \node[label, below=0.05cm of S20] {$S_0 d^2$};
+    \node[payoff, right=0.8cm of S20] (P20) {$V_{2,0}$};
+    
+    % Price tree connections (gray) - from t=0 to t=1
+    \draw[gray, thick] (S0) -- (S12) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S0) -- (S11) node[midway, above, font=\tiny, xshift=-2mm] {$m$};
+    \draw[gray, thick] (S0) -- (S10) node[midway, below left, font=\tiny] {$d$};
+    
+    % Price tree connections (gray) - from t=1 to t=2
+    \draw[gray, thick] (S12) -- (S24) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S12) -- (S23) node[midway, below left, font=\tiny, yshift=1mm] {$m$};
+    \draw[gray, thick] (S12) -- (S22) node[midway, below left, font=\tiny] {$d$};
+    
+    \draw[gray, thick] (S11) -- (S23) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S11) -- (S22) node[midway, above, font=\tiny, yshift=1mm] {$m$};
+    \draw[gray, thick] (S11) -- (S21) node[midway, below left, font=\tiny] {$d$};
+    
+    \draw[gray, thick] (S10) -- (S22) node[midway, above left, font=\tiny] {$u$};
+    \draw[gray, thick] (S10) -- (S21) node[midway, below left, font=\tiny, yshift=-1mm] {$m$};
+    \draw[gray, thick] (S10) -- (S20) node[midway, below left, font=\tiny] {$d$};
+    
+    % Backward induction arrows - from t=2 to t=1
+    \draw[arrow, red!70, dashed] (P24) to[bend left=8] node[midway, above, font=\tiny,xshift=3mm] {$p_u$} (V12);
+    \draw[arrow, red!70, dashed] (P23) -- (V12) node[midway, right, font=\tiny, xshift=3mm] {$p_m$};
+    \draw[arrow, red!70, dashed] (P22) to[bend right=8] node[midway, below, font=\tiny, xshift=3mm] {$p_d$} (V12);
+    
+    \draw[arrow, red!70, dashed] (P23) to[bend left=6] node[midway, above, font=\tiny, xshift=3mm] {$p_u$} (V11);
+    \draw[arrow, red!70, dashed] (P22) -- (V11) node[midway, right, font=\tiny, xshift=3mm] {$p_m$};
+    \draw[arrow, red!70, dashed] (P21) to[bend right=6] node[midway, below, font=\tiny, xshift=3mm] {$p_d$} (V11);
+    
+    \draw[arrow, red!70, dashed] (P22) to[bend left=8] node[midway, above, font=\tiny, xshift=3mm] {$p_u$} (V10);
+    \draw[arrow, red!70, dashed] (P21) -- (V10) node[midway, right, font=\tiny, xshift=3mm] {$p_m$};
+    \draw[arrow, red!70, dashed] (P20) to[bend right=8] node[midway, below, font=\tiny, xshift=3mm] {$p_d$} (V10);
+    
+    % From t=1 to t=0
+    \draw[arrow, green!70, very thick] (V12) to[bend right=10] node[midway, above left, font=\tiny] {$p_u$} (V0);
+    \draw[arrow, green!70, very thick] (V11) -- (V0) node[midway, left, font=\tiny, xshift=-1mm] {$p_m$};
+    \draw[arrow, green!70, very thick] (V10) to[bend left=10] node[midway, below left, font=\tiny] {$p_d$} (V0);
+    
+    % Step labels
+    \node[draw, fill=red!10, text width=3cm, align=left, font=\tiny, thick] at (15, 2.5) {
+      \textbf{Étape 1 :} \\[1mm]
+      Payoffs à maturité $T$ \\[0.5mm]
+      $V_{2,j} = \text{payoff}(S_{2,j})$ \\[0.5mm]
+      Ex: Call $\max(S_{2,j}-K, 0)$
+    };
+    
+    \node[draw, fill=orange!10, text width=3cm, align=left, font=\tiny, thick] at (15, 0) {
+      \textbf{Étape 2 :} \\[1mm]
+      Rétropropagation \\[0.5mm]
+      $C_{i,j} = e^{-r\Delta t} \times$ \\[0.5mm]
+      $[p_u \cdot V_{i+1,j+2} + p_m \cdot V_{i+1,j+1}$ \\[0.5mm]
+      $+ p_d \cdot V_{i+1,j}]$
+    };
+    
+    \node[draw, fill=green!10, text width=3cm, align=left, font=\tiny, thick] at (15, -2.5) {
+      \textbf{Étape 3 :} \\[1mm]
+      Prix initial de l'option \\[0.5mm]
+      $V_0 = V_{0,0}$ \\[0.5mm]
+      Résultat final
+    };
+    
+    \end{tikzpicture}
+  \end{center}
+  
+  \vspace{-3mm}
+  
+  \begin{formulabox}\scriptsize
+    \textbf{Condition :} Européenne : $V_{i,j} = C_{i,j}$ \quad | \quad
+    Américaine : $V_{i,j} = \max(\text{payoff}(S_{i,j}), C_{i,j})$
+  \end{formulabox}
+\end{frame}
+
+% ================== SECTION 4: OPTIONS AMÉRICAINES ==================
+\section{Options américaines}
+
+% ===== SLIDE 9: FRONTIÈRE D'EXERCICE =====
+\begin{frame}{Frontière d'exercice anticipé}
+  \small
+  
+  \begin{keybox}{Définition}
+    \scriptsize
+    La \textbf{frontière d'exercice} $S^*(t)$ sépare deux zones :
+    \begin{itemize}\scriptsize
+      \item \textbf{Zone d'exercice} : pour un put, si $S \le S^*(t)$ $\Rightarrow$ exercer immédiatement
+      \item \textbf{Zone de continuation} : si $S > S^*(t)$ $\Rightarrow$ attendre est optimal
+    \end{itemize}
+  \end{keybox}
+  \begin{center}
+  \begin{tikzpicture}
+    \begin{axis}[
+      width=0.75\textwidth,
+      height=0.35\textwidth,
+      xlabel={\scriptsize Temps $t$},
+      ylabel={\scriptsize Prix critique $S^*(t)$},
+      xmin=0, xmax=1,
+      ymin=60, ymax=110,
+      grid=both,
+      tick label style={font=\scriptsize},
+      legend style={font=\scriptsize, fill=white},
+      legend pos=north west
+    ]
+      \addplot[Secondary, thick, mark=*] coordinates{
+        (0.2,62) (0.4,66) (0.6,72) (0.8,82) (0.95,100)
+      };
+      \addlegendentry{Frontière put américain}
+      \addplot[dashed, Primary] coordinates{(0,90) (1,90)};
+      \addlegendentry{Strike $K=90$}
+    \end{axis}
+  \end{tikzpicture}
+  \end{center}
+  
+  {\scriptsize\textit{Note :} Au début, la frontière peut être absente si l'exercice n'est jamais optimal (continuation domine).}
+\end{frame}
+
+% ===== SLIDE 10: ALGORITHME FRONTIÈRE =====
+\begin{frame}{Calcul de la frontière d'exercice --- Algorithme}
+  \small
+  
+  \textbf{Étapes de l'algorithme}
+  \begin{enumerate}\scriptsize
+    \item Construire l'arbre complet des prix du sous-jacent
+    \item Initialiser les valeurs terminales avec les payoffs
+    \item \textbf{Remonter l'arbre} (backward induction) :
+    \begin{itemize}\scriptsize
+      \item Calculer $C$ (valeur de continuation)
+      \item Calculer $V = \max(\text{intrinsèque}, C)$ pour option américaine
+    \end{itemize}
+    \item \textbf{À chaque date $t_i$} : identifier les nœuds où l'exercice est optimal
+    \begin{itemize}\scriptsize
+      \item Put : garder le \emph{plus grand} $S$ exercé $\Rightarrow$ $S^*(t_i)$
+      \item Call : garder le \emph{plus petit} $S$ exercé $\Rightarrow$ $S^*(t_i)$
+    \end{itemize}
+    \item Stocker les points $(t_i, S^*(t_i))$ et tracer la courbe $S^*(t)$
+  \end{enumerate}
+\end{frame}
+
+% ================== SECTION 5: RÉSULTATS ==================
+\section{Résultats et validation}
+
+% ===== SLIDE 11: CONVERGENCE =====
+\begin{frame}{Convergence --- Précision vs complexité}
+  \small
+  \begin{itemize}\scriptsize
+    \item \textbf{CRR (binomial)} : Erreur $\sim O(1/\sqrt{N})$
+    \item \textbf{Boyle (trinomial)} : Erreur $\sim O(1/N)$ à $N$ comparable
+    \item \textbf{Complexité} : $O(N^2)$ en temps, $O(N)$ en mémoire
+  \end{itemize}
+
+  \begin{center}
+    \begin{tikzpicture}
+      \begin{axis}[
+        width=0.75\textwidth,
+        height=0.39\textwidth,
+        xlabel={\scriptsize Nombre de pas $N$},
+        ylabel={\scriptsize Erreur relative (\%)},
+        xmin=0, xmax=120,
+        ymin=0, ymax=1.0,
+        grid=both,
+        legend pos=north east,
+        tick label style={font=\scriptsize},
+        legend style={font=\scriptsize, fill=white}
+      ]
+        \addplot[thick, mark=*, Primary] coordinates{
+          (10,0.90) (20,0.55) (40,0.32) (60,0.25) (80,0.21) (100,0.18)
+        };
+        \addlegendentry{CRR (binomial)}
+        
+        \addplot[thick, mark=square*, Secondary] coordinates{
+          (10,0.62) (20,0.34) (40,0.19) (60,0.15) (80,0.13) (100,0.12)
+        };
+        \addlegendentry{Boyle (trinomial)}
+      \end{axis}
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ===== SLIDE 12: TESTS DE VALIDATION =====
+\begin{frame}{Tests de validation}
+  \small
+  
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \begin{keybox}{Arbitrage et parité}
+        \scriptsize
+        \textbf{Parité put-call européenne :}
+        
+        $C - P = S_0e^{-qT} - Ke^{-rT}$
+        
+        Erreur observée : $< 0.02\%$
+        
+        \vspace{2mm}
+        \textbf{Bornes d'arbitrage :}
+        
+        $C \ge \max(S_0e^{-qT} - Ke^{-rT}, 0)$
+        
+        $P \ge \max(Ke^{-rT} - S_0e^{-qT}, 0)$
+      \end{keybox}
+      
+      \vspace{2mm}
+      \begin{keybox}{Mesure risque-neutre}
+        \scriptsize
+        \textbf{Probabilités valides :}
+        
+        Binomial : $p \in [0,1]$
+        
+        Trinomial : $p_u, p_m, p_d \in [0,1]$
+        
+        \vspace{1mm}
+        \textbf{Martingale :}
+        
+        $\E_\Q[S_{t+\Delta t}] = S_t e^{(r-q)\Delta t}$
+      \end{keybox}
+    \end{column}
+    
+    \begin{column}{0.48\textwidth}
+    \vspace{1.4cm}
+      \begin{block}{Américaines}\scriptsize
+        \textbf{Prime d'exercice anticipé :}
+        
+        Put américain : Prime $\ge 0$
+        
+        Call américain ($q=0$) : Prime $= 0$
+        
+        \vspace{2mm}
+        \textbf{Frontière $S^*(t)$ :}
+        
+        Monotonicité quasi croissante (avec tolérance pour discrétisation)
+      \end{block}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ================== SECTION 6: ARCHITECTURE ==================
+\section{Architecture et démonstration}
+
+% ===== SLIDE 13: ARCHITECTURE LOGICIELLE =====
+\begin{frame}{Architecture logicielle}
+  \small
+  
+  \vspace{5mm}
+  
+  \textbf{Backend (Python)}
+  \begin{itemize}\scriptsize
+    \item Framework : FastAPI (API REST haute performance)
+    \item Librairies : NumPy, SciPy (calculs numériques)
+    \item Fonctionnalités : pricing, calcul des grecques, frontières d'exercice, tests de validation
+  \end{itemize}
+  
+  \vspace{-1.5mm}
+  \textbf{Frontend (TypeScript)}
+  \begin{itemize}\scriptsize
+    \item Framework : Next.js (React)
+    \item Styling : Tailwind CSS
+    \item Visualisation : Recharts (graphiques interactifs)
+  \end{itemize}
+
+  
+  \vspace{-1.5mm}
+  \begin{keybox}{Flux de données}
+    \scriptsize
+    Interface utilisateur $\leftrightarrow$ API REST $\leftrightarrow$ Moteur de pricing (BS/CRR/Boyle)
+  \end{keybox}
+\end{frame}
+
+% ===== SLIDE 14: DÉMONSTRATION =====
+\begin{frame}{Démonstration de la plateforme}
+  \small
+  \begin{center}
+      \vspace{15mm}
+        {\huge \href{https://options-binomial.vercel.app}{\textcolor{Secondary}{\textbf{options-binomial.vercel.app}}}}
+  \end{center}
+\end{frame}
+
+% ================== SECTION 7: CONCLUSION ==================
+\section{Conclusion}
+
+% ===== SLIDE 15: CONCLUSION ET PERSPECTIVES =====
+\begin{frame}{Conclusion et perspectives}
+  \small
+  
+  \vspace{2mm}
+  \textbf{Réalisations}
+  \begin{itemize}\scriptsize
+    \item Implémentation complète de BSM, CRR et Boyle
+    \item Traitement des options américaines avec calcul de la frontière d'exercice
+    \item Validation rigoureuse : convergence, parité put-call, conditions de non-arbitrage
+    \item Application web interactive connectée aux données de marché réelles
+    \item Documentation complète et tests unitaires
+  \end{itemize}
+  
+  \vspace{-2mm}
+  \textbf{Extensions futures}
+  \begin{itemize}\scriptsize
+    \item \textbf{Options bermudanes} : exercice à dates spécifiques
+    \item \textbf{Surface de volatilité} : calibration et modélisation de la volatilité implicite
+    \item \textbf{Options exotiques} : barrières, asiatiques, lookback
+  \end{itemize}
+\end{frame}
+
+% ===== SLIDE 16: MERCI =====
+\begin{frame}[plain]
+  \begin{center}
+    \vspace{15mm}
+    {\Huge \textbf{Merci pour votre attention !}}
+    
+    \vspace{10mm}
+    {\Large \textbf{Questions ?}}
+    
+    \vspace{12mm}
+    {\small \textcolor{Primary}{\textbf{hassanelqadi3@gmail.com}}}
+    
+    \vspace{2mm}
+    {\small Démo interactive : \href{https://options-binomial.vercel.app}{\textcolor{Secondary}{\textbf{options-binomial.vercel.app}}}}
+  \end{center}
+\end{frame}
+
+\end{document}

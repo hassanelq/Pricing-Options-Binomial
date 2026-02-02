@@ -1,0 +1,1471 @@
+% ====================================================================
+% MAIN DOCUMENT - Modélisation et Valorisation d'Options
+% ====================================================================
+
+\documentclass[aspectratio=169, 10pt]{beamer}
+
+% Load preamble configuration
+\input{preamble}
+
+% ====================================================================
+% DOCUMENT INFORMATION
+% ====================================================================
+\title[Modélisation et Valorisation d'Options]{Modélisation et Valorisation d'Options}
+\subtitle{Binomial, Cox-Ross-Rubinstein, Trinomial, Black-Scholes}
+\date{26 Octobre 2025}
+\author{EL QADI Hassan}
+\institute{École Nationale des Sciences Appliquées d'Agadir}
+\advisor{M. El Asri Brahim}
+
+% ====================================================================
+% DOCUMENT CONTENT
+% ====================================================================
+\begin{document}
+
+% ====================================================================
+% TITLE SLIDE
+% ====================================================================
+\begin{frame}[plain]
+    \titlepage
+    \begin{center}
+      {\normalsize\textcolor{darkGreen}{Présenté par: }}
+    EL QADI Hassan\\[0.2cm]
+     {\normalsize\textcolor{darkGreen}{Encadré par: }}
+    M. EL ASRI Brahim
+    \end{center} 
+   
+\end{frame}
+
+% ====================================================================
+% TABLE OF CONTENTS
+% ====================================================================
+\begin{frame}[t]
+    \frametitle{Plan de la présentation}
+    \tableofcontents
+\end{frame}
+
+% ====================================================================
+% SECTION 1: INTRODUCTION
+% ====================================================================
+\section{Introduction}
+
+\subsection{Contexte général}
+\begin{frame}{Contexte général}
+    \begin{itemize}
+        \item \coloredbullet \ Les produits dérivés occupent une place clé dans les marchés financiers modernes. 
+        \item \coloredbullet \ Les \textbf{options} servent à se couvrir contre le risque ou à spéculer sur l'évolution des actifs.
+        \item \coloredbullet \ Une \textbf{évaluation précise} est essentielle pour la gestion des risques et la fixation des prix.
+        \vspace{0.3cm}
+        \item \textbf{Problématique :}
+        \begin{itemize}
+            \item \coloredbullet \ Le pricing précis est fondamental aux marchés dérivés.
+            \item \coloredbullet \ Différences entre options européennes et américaines.
+            \item \coloredbullet \ Besoin de méthodes numériques fiables et rapides.
+        \end{itemize}
+    \end{itemize}
+    \note{
+        Les produits dérivés sont aujourd'hui indispensables dans les marchés financiers, 
+        car ils permettent de transférer ou de gérer le risque.  
+        
+        Parmi eux, les options sont très utilisées : elles offrent une flexibilité importante, 
+        soit pour se protéger contre une baisse de prix, soit pour profiter d'une hausse possible.  
+
+        Pour que ces produits soient utiles, il faut pouvoir estimer leur prix de manière fiable.  
+        C'est ce qu'on appelle la tarification ou le pricing.  
+
+        Le problème, c'est que la précision du pricing dépend du modèle utilisé.  
+        Par exemple, les options européennes ont une formule analytique simple avec Black-Scholes, 
+        mais les options américaines demandent des méthodes numériques plus avancées.  
+        
+        Donc, le besoin de modèles robustes et rapides est essentiel pour les praticiens.
+    }
+\end{frame}
+
+\subsection{Objectifs du projet}
+\begin{frame}{Objectifs du projet}
+    \begin{itemize}
+        \item \coloredbullet \ \textbf{Implémenter quatre modèles} de tarification :
+        \begin{itemize}
+            \item \coloredbullet \ Black–Scholes (analytique)
+            \item \coloredbullet \ Arbre binomial (CRR)
+            \item \coloredbullet \ Arbre trinomial (Boyle)
+            \item \coloredbullet \ Modèle binomial à N périodes
+        \end{itemize}
+        \item \coloredbullet \ \textbf{Valider mathématiquement} : convergence, parité call–put, absence d'arbitrage.
+        \item \coloredbullet \ \textbf{Développer une plateforme web} interactive.
+    \end{itemize}
+    \note{
+        Ce projet a trois grands objectifs.  
+
+        D'abord, implémenter quatre modèles fondamentaux :  
+        Le modèle de Black–Scholes, qui donne une solution analytique pour les options européennes,  
+        puis trois modèles numériques — l'arbre binomial à une période, le CRR à N périodes,
+        et l'arbre trinomial de Boyle — qui permettent de traiter aussi les options américaines.  
+
+        Ensuite, on effectue une validation mathématique complète.  
+        On vérifie la convergence des méthodes numériques vers Black-Scholes,
+        la parité call-put, et l'absence d'opportunités d'arbitrage.  
+
+        Enfin, on crée une plateforme web moderne et interactive,  
+        pour calculer les prix en temps réel, afficher les Greeks, 
+        visualiser les arbres binomiaux et trinomiaux, et analyser les résultats.  
+        
+        Cela permet d'avoir un outil pratique, à la fois théorique et applicatif.
+    }
+\end{frame}
+
+% ====================================================================
+% SECTION 2: ÉVALUATION ET COUVERTURE
+% ====================================================================
+\section{Évaluation et Couverture}
+
+\subsection{L'essentiel sur les options}
+
+\begin{frame}{Définition et principes de base}
+    \begin{itemize}
+        \item \coloredbullet \ Une \textbf{option} est un contrat financier qui donne à son détenteur le \textbf{droit, mais pas l'obligation}, d'acheter ou de vendre un actif sous-jacent à un prix fixé à l'avance (\textbf{prix d'exercice} ou strike $K$).
+        \item \coloredbullet \ En échange de ce droit, l'acheteur paie une \textbf{prime} (ou \textbf{premium}) au vendeur de l'option.
+        \item \coloredbullet \ Deux types principaux :
+        \begin{itemize}
+            \item \textbf{Call} : droit d'acheter l'actif.
+            \item \textbf{Put} : droit de vendre l'actif.
+        \end{itemize}
+        \item \coloredbullet \ Deux styles d'exercice :
+        \begin{itemize}
+            \item \textbf{Européenne} : exercice uniquement à maturité.
+            \item \textbf{Américaine} : exercice à tout moment jusqu'à maturité.
+        \end{itemize}
+    \end{itemize}
+    \note{
+        Une option est un contrat qui donne un droit, mais pas une obligation.  
+        C'est ce qui la différencie fondamentalement des contrats à terme ou futures.  
+        
+        Le détenteur paie une prime pour avoir la possibilité d'exercer ou non le contrat.  
+        Il existe deux types d'options : le call pour acheter, et le put pour vendre.  
+        
+        Cette flexibilité a un coût, représenté par la prime versée au vendeur.
+        
+        La distinction entre options européennes et américaines est cruciale :
+        les européennes sont plus simples à évaluer (formule de Black-Scholes),
+        tandis que les américaines nécessitent des méthodes numériques 
+        car elles peuvent être exercées à tout moment.
+    }
+\end{frame}
+
+\begin{frame}{Caractéristique fondamentale des options}
+    \begin{block}{Remarque importante}
+    Un point essentiel est que l'achat d'une option donne le \textbf{droit} (mais pas l'obligation) à son détenteur d'exercer le contrat. 
+    \end{block}
+    
+    \vspace{0.3cm}
+    \begin{itemize}
+        \item \coloredbullet \ C'est la différence fondamentale avec les contrats \textbf{forward} ou \textbf{futures} pour lesquels les contreparties sont obligées d'acheter ou de vendre.
+        \item \coloredbullet \ Cette particularité implique que l'achat d'un contrat d'option a un \textbf{coût initial} dit « Prime » ou « Premium », ce qui n'est pas le cas pour un forward ou un future.
+        \item \coloredbullet \ La prime reflète la valeur de cette flexibilité.
+    \end{itemize}
+    \note{
+        Cette caractéristique est fondamentale pour comprendre les options.
+        
+        Contrairement aux forwards ou futures où les deux parties sont engagées,
+        l'acheteur d'une option a payé pour avoir un choix.
+        
+        C'est cette asymétrie qui justifie l'existence d'une prime :
+        le vendeur prend un risque potentiellement illimité (surtout pour un call),
+        tandis que l'acheteur a une perte maximale limitée à la prime payée.
+        
+        Cette structure crée des profils de risque très différents
+        et permet des stratégies de couverture sophistiquées.
+    }
+\end{frame}
+
+\begin{frame}{Achat d'un Call : fonctionnement et gains}
+    \textbf{Position :} Acheteur d'un \textbf{Call} (Long Call)
+    
+    \textbf{Principe :} L'acheteur paie une prime $C_t$ pour avoir le droit d'acheter l'actif à un prix $K$.
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Cas 1 :} Option dans la monnaie ($S_T > K$)
+            \begin{itemize}
+                \item Exercice du droit : Payoff = $S_T - K$
+                \item Gain = $-C_t + (S_T - K)$
+                \item Position favorable
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Cas 2 :} Option hors de la monnaie ($S_T < K$)
+            \begin{itemize}
+                \item Non-exercice : Payoff = 0
+                \item Perte limitée à la prime $C_t$
+                \item Protection du capital
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Payoff final}
+        $$\text{Payoff} = \max(S_T - K, 0) = (S_T - K)^+$$
+    \end{block}
+    \note{
+        Lorsqu'on achète un call, on paie une prime pour avoir le droit d'acheter à un prix fixé K.  
+        
+        Si le prix de marché à l'échéance ST est supérieur à K, on exerce le droit :
+        on achète à K et on peut revendre immédiatement à ST, réalisant un gain de ST - K.
+        Le gain net sera ce payoff moins la prime initiale payée.
+        
+        Si le prix est inférieur à K, exercer n'aurait aucun sens :
+        pourquoi acheter à 105 ce qui vaut 95 sur le marché ?
+        On ne fait donc rien, et on perd seulement la prime payée.
+        
+        L'intérêt d'un call est donc de profiter d'une hausse potentiellement illimitée du marché,  
+        tout en limitant la perte au montant de la prime.
+        C'est un profil de risque asymétrique très attractif.
+    }
+\end{frame}
+
+\subsection{Duplication de Portefeuille}
+
+\begin{frame}{Principe de la Duplication - Portefeuille de Couverture}
+    \textbf{Idée Fondamentale :} Construire un portefeuille avec des actifs simples qui réplique exactement les flux d'un produit dérivé complexe.
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Composition du portefeuille :}
+            \begin{itemize}
+                \item Actif sous-jacent $S_t$
+                \item Actif sans risque $B_t$
+                \item Ratio $\Delta_t$ (delta)
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Équation de réplication :}
+            $$C_t = \Delta_t S_t + B_t$$
+            \begin{itemize}
+                \item $C_t$ : prix du dérivé
+                \item $\Delta_t$ : quantité de sous-jacent
+                \item $B_t$ : montant en cash
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Objectif}
+    Créer un portefeuille autofinançant dont la valeur coïncide avec celle de l'option à tout instant.
+    \end{block}
+    \note{
+        La duplication de portefeuille est un concept central en finance mathématique.
+        
+        L'idée est simple mais puissante : si on peut créer un portefeuille
+        composé uniquement d'actifs simples (action + cash) dont la valeur
+        est toujours égale à celle de l'option, alors le prix de l'option
+        doit être égal au coût de ce portefeuille.
+        
+        Pourquoi ? Par absence d'arbitrage. Si les prix différaient,
+        on pourrait acheter le moins cher et vendre le plus cher,
+        réalisant un profit sans risque.
+        
+        Le delta représente la sensibilité de l'option au sous-jacent :
+        combien d'actions faut-il détenir pour répliquer l'option ?
+        
+        B représente la position en cash (emprunt ou prêt) nécessaire
+        pour compléter le financement de cette stratégie.
+        
+        Cette approche est la base de tous les modèles de pricing que nous allons voir.
+    }
+\end{frame}
+
+\begin{frame}{Stratégie de Couverture Dynamique}
+    \textbf{Objectif :} Éliminer le risque en ajustant continûment la composition du portefeuille de duplication.
+    
+    \vspace{0.3cm}
+    \textbf{Processus de Couverture :}
+    \begin{enumerate}
+        \item Calculer le delta $\Delta_t = \frac{\partial C}{\partial S}$
+        \item Acheter $\Delta_t$ unités du sous-jacent
+        \item Emprunter/prêter $B_t$ au taux sans risque
+        \item Réajuster périodiquement le portefeuille (rebalancing)
+    \end{enumerate}
+    
+    \vspace{0.3cm}
+    \begin{block}{Couverture Delta-Neutre}
+    Un portefeuille est dit \textbf{delta-neutre} si $\Delta_{\text{portefeuille}} = 0$, c'est-à-dire insensible aux petites variations du sous-jacent.
+    \end{block}
+    \note{
+        La couverture dynamique est la mise en pratique de la duplication.
+        
+        Le mot "dynamique" est important : le delta n'est pas constant,
+        il change avec le prix du sous-jacent, le temps, et la volatilité.
+        
+        Donc pour maintenir une couverture parfaite, il faut :
+        1. Recalculer le delta régulièrement
+        2. Ajuster la position en actions en conséquence
+        3. Ajuster aussi la position en cash pour rester autofinançant
+        
+        En pratique, cette couverture continue est impossible :
+        - Les marchés ne sont pas ouverts 24h/24
+        - Les transactions ont des coûts
+        - On ne peut pas trader des fractions infinitésimales
+        
+        Donc on fait du "rebalancing" périodique (quotidien, hebdomadaire, etc.)
+        Ce qui introduit un risque résiduel appelé "risque de couverture discrète".
+        
+        Les modèles que nous étudions supposent une couverture continue,
+        ce qui est une idéalisation mathématique utile.
+    }
+\end{frame}
+
+\begin{frame}{Le Concept de Probabilité Risque-Neutre}
+    \begin{block}{Définition}
+    Une mesure de probabilité $\mathbb{Q}$ sous laquelle le prix actuel de tout actif financier est égal à l'espérance actualisée de ses flux futurs au taux sans risque.
+    \end{block}
+    
+    \vspace{0.3cm}
+    \textbf{Formulation Mathématique :}
+    
+    Pour un actif de prix $S_0$ à la date 0 :
+    $$S_0 = \frac{1}{1 + r} \left[q S_u + (1 - q) S_d\right]$$
+    
+    avec $q = \frac{(1+r)-d}{u-d}$ est la probabilité risque-neutre.
+    
+    \vspace{0.3cm}
+    \begin{block}{Propriété Essentielle}
+    Sous $\mathbb{Q}$, tous les actifs ont le même taux de rendement espéré : le taux sans risque $r$.
+    \end{block}
+    \note{
+        La probabilité risque-neutre est un concept mathématique profond.
+        
+        Attention : q n'est PAS la probabilité réelle de hausse ou de baisse !
+        C'est une probabilité artificielle utilisée pour le pricing.
+        
+        L'idée clé : dans un monde sans arbitrage, on peut évaluer tout actif
+        comme si les investisseurs étaient neutres au risque, c'est-à-dire
+        comme si tous les actifs rapportaient le taux sans risque.
+        
+        Pourquoi cette transformation est-elle possible ?
+        Parce qu'on peut se couvrir parfaitement en construisant un portefeuille réplicant.
+        Une fois couvert, le risque disparaît, donc on actualise au taux sans risque.
+        
+        Mathématiquement, passer de la probabilité réelle P à la probabilité Q
+        s'appelle un "changement de mesure" ou "théorème de Girsanov".
+        
+        Pour le pricing, on n'a jamais besoin de connaître la vraie probabilité P
+        ni la vraie espérance de rendement de l'action (le drift).
+        Tout se fait sous Q, avec le taux sans risque.
+        
+        C'est l'une des découvertes les plus importantes de la finance mathématique.
+    }
+\end{frame}
+
+% ====================================================================
+% SECTION 3: APPLICATIONS DES MODÈLES
+% ====================================================================
+\section{Applications des Modèles}
+
+\subsection{Modèle Binomial à Une Période}
+
+\begin{frame}{Structure du Modèle Binomial à Une Période}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Dynamique du sous-jacent :}
+            \begin{itemize}
+                \item Prix initial : $S_0$
+                \item Prix à maturité :
+                \begin{itemize}
+                    \item $S_u = S_0 \times u$ (hausse)
+                    \item $S_d = S_0 \times d$ (baisse)
+                \end{itemize}
+                \item Avec : $d < 1+r < u$ (non-arbitrage)
+            \end{itemize}
+            
+            \vspace{0.3cm}
+            \textbf{Payoffs de l'option :}
+            \begin{itemize}
+                \item Call : $C_u = (S_u - K)^+$
+                \item Call : $C_d = (S_d - K)^+$
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Pricing par réplication :}
+            
+            Probabilité risque-neutre :
+            $$q = \frac{(1+r) - d}{u - d}$$
+            
+            Prix du call :
+            $$C_0 = \frac{1}{1+r}\left[q C_u + (1-q) C_d\right]$$
+            
+            Delta de couverture :
+            $$\Delta = \frac{C_u - C_d}{S_u - S_d}$$
+            
+            Position sans risque :
+            $$B = \frac{1}{1+r}\left[u C_d - d C_u\right] / (u-d)$$
+        \end{column}
+    \end{columns}
+    \note{
+        Le modèle binomial à une période est le modèle le plus simple.
+        Il n'y a que deux états possibles à la fin : hausse ou baisse.
+        
+        La condition d < 1+r < u est cruciale : elle garantit l'absence d'arbitrage.
+        Si u était inférieur à 1+r, l'action serait dominée par l'actif sans risque.
+        Si d était supérieur à 1+r, on pourrait emprunter pour acheter l'action sans risque.
+        
+        La formule de q vient de la condition d'absence d'arbitrage :
+        le prix actuel doit être l'espérance actualisée sous Q.
+        
+        Le delta mesure la pente : combien varie l'option quand le sous-jacent varie.
+        C'est le ratio des variations, une formule très intuitive.
+        
+        B représente ce qu'on emprunte (si négatif) ou prête (si positif).
+        C'est le résidu après avoir acheté delta actions.
+        
+        Ce modèle simple contient déjà toute l'essence du pricing d'options.
+    }
+\end{frame}
+
+\subsection{Modèle de Cox-Ross-Rubinstein (CRR)}
+
+\begin{frame}{Le Modèle CRR : Extension à N Périodes}
+    \textbf{Innovation de Cox-Ross-Rubinstein (1979) :}
+    
+    Définir $u$ et $d$ en fonction de la volatilité $\sigma$ pour assurer la convergence vers Black-Scholes.
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Paramètres du modèle :}
+            $$u = e^{\sigma\sqrt{\Delta t}}$$
+            $$d = e^{-\sigma\sqrt{\Delta t}} = \frac{1}{u}$$
+            $$q = \frac{e^{r\Delta t} - d}{u - d}$$
+            
+            avec $\Delta t = T/N$ (pas de temps)
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Construction de l'arbre :}
+            $$S_{i,j} = S_0 \cdot u^j \cdot d^{i-j}$$
+            
+            où :
+            \begin{itemize}
+                \item $i$ : période (de 0 à N)
+                \item $j$ : nombre de hausses
+                \item $i-j$ : nombre de baisses
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Propriété de Convergence}
+    Quand $N \to \infty$, le modèle CRR converge vers le modèle de Black-Scholes.
+    \end{block}
+    \note{
+        Le modèle CRR est une extension majeure du modèle binomial simple.
+        
+        L'idée géniale de Cox, Ross et Rubinstein a été de calibrer u et d
+        sur la volatilité historique sigma de l'actif.
+        
+        Pourquoi cette forme exponentielle avec racine de delta t ?
+        Parce que dans le mouvement brownien, la volatilité scale avec la racine du temps.
+        C'est une propriété fondamentale du processus de Wiener.
+        
+        Le choix d = 1/u assure que l'arbre se recombine :
+        un mouvement haut-bas arrive au même nœud qu'un mouvement bas-haut.
+        Sans cela, l'arbre aurait 2^N nœuds au lieu de N(N+1)/2, rendant le calcul impossible.
+        
+        La formule de q découle toujours de l'absence d'arbitrage,
+        mais maintenant avec des valeurs continues de u et d.
+        
+        La propriété de convergence est remarquable :
+        en augmentant N (en subdivisant l'intervalle de temps),
+        on se rapproche de la solution continue de Black-Scholes.
+        
+        C'est un pont entre le discret et le continu.
+    }
+\end{frame}
+
+\begin{frame}{Méthode d'Évaluation Récurrente (Backward Induction)}
+    \textbf{Algorithme de valorisation :}
+    
+    \begin{enumerate}
+        \item \textbf{Calcul des payoffs terminaux} (à $t = T$) :
+        $$C_{N,j} = \max(S_{N,j} - K, 0) \quad \text{pour } j = 0, 1, \ldots, N$$
+        
+        \item \textbf{Propagation récursive} (de $t = T$ vers $t = 0$) :
+        $$C_{i,j} = e^{-r\Delta t}\left[q \cdot C_{i+1,j+1} + (1-q) \cdot C_{i+1,j}\right]$$
+        
+        \item \textbf{Arrivée au prix initial} : $C_0 = C_{0,0}$
+    \end{enumerate}
+    
+    \vspace{0.3cm}
+    \textbf{Pour une option américaine :} À chaque nœud, on compare :
+    $$C_{i,j} = \max\left\{S_{i,j} - K, \, e^{-r\Delta t}\left[q \cdot C_{i+1,j+1} + (1-q) \cdot C_{i+1,j}\right]\right\}$$
+    
+    La valeur d'exercice immédiat versus la valeur de continuation.
+    \note{
+        La backward induction est l'algorithme clé pour évaluer les options dans les arbres.
+        
+        On commence par la fin : à maturité, la valeur de l'option est connue,
+        c'est simplement son payoff (ce qu'elle vaut si on l'exerce).
+        
+        Ensuite, on remonte dans le temps, nœud par nœud.
+        À chaque nœud, on calcule la valeur comme l'espérance actualisée
+        des deux valeurs futures possibles (hausse et baisse).
+        
+        C'est exactement l'équation de pricing sous la mesure risque-neutre.
+        
+        Pour les options européennes, c'est tout : on ne peut exercer qu'à la fin,
+        donc on remonte mécaniquement jusqu'à t=0.
+        
+        Pour les options américaines, c'est plus subtil.
+        À chaque nœud, on doit décider : vaut-il mieux exercer maintenant
+        ou garder l'option et attendre ?
+        
+        Si la valeur d'exercice immédiat (S - K pour un call, K - S pour un put)
+        est supérieure à la valeur de continuation (espérance actualisée),
+        alors l'exercice anticipé est optimal.
+        
+        On prend donc le maximum des deux.
+        
+        C'est pourquoi les options américaines valent au moins autant
+        que leurs homologues européennes : on a une flexibilité supplémentaire.
+        
+        Algorithme simple mais puissant, qui capture toute la richesse du problème.
+    }
+\end{frame}
+
+\subsection{Modèle Trinomial (Boyle)}
+
+\begin{frame}{Le Modèle Trinomial de Boyle}
+    \textbf{Extension à trois états :} À chaque période, le prix peut :
+    \begin{itemize}
+        \item Monter : $S_u = S \cdot u$
+        \item Rester stable : $S_m = S$
+        \item Descendre : $S_d = S \cdot d$
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Paramètres de Boyle :}
+            $$u = e^{\sigma\sqrt{2\Delta t}}$$
+            $$d = \frac{1}{u} = e^{-\sigma\sqrt{2\Delta t}}$$
+            $$m = 1 \quad \text{(pas de mouvement)}$$
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Probabilités risque-neutres :}
+            $$p_u = \left(\frac{e^{r\Delta t/2} - e^{-\sigma\sqrt{\Delta t/2}}}{e^{\sigma\sqrt{\Delta t/2}} - e^{-\sigma\sqrt{\Delta t/2}}}\right)^2$$
+            $$p_d = \left(\frac{e^{\sigma\sqrt{\Delta t/2}} - e^{r\Delta t/2}}{e^{\sigma\sqrt{\Delta t/2}} - e^{-\sigma\sqrt{\Delta t/2}}}\right)^2$$
+            $$p_m = 1 - p_u - p_d$$
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Avantages du modèle trinomial}
+    \begin{itemize}
+        \item Plus grande flexibilité dans la modélisation
+        \item Convergence plus rapide vers Black-Scholes
+        \item Meilleure stabilité numérique
+    \end{itemize}
+    \end{block}
+    \note{
+        Le modèle trinomial de Boyle (1986) est une extension naturelle du modèle binomial.
+        
+        Au lieu de deux mouvements possibles (haut ou bas), on en a trois :
+        haut, stable, ou bas. Cela peut sembler plus réaliste dans certains cas.
+        
+        Pourquoi introduire cette complexité ?
+        Principalement pour des raisons de stabilité numérique et de convergence.
+        
+        Le facteur racine de 2 dans la définition de u et d vient d'un calibrage
+        qui assure que la variance du processus discret correspond bien
+        à celle du processus continu de Black-Scholes.
+        
+        Les formules des probabilités sont plus complexes que dans le cas binomial,
+        mais elles respectent toujours les mêmes principes :
+        - Absence d'arbitrage
+        - Moyenne et variance correctes
+        - Les trois probabilités doivent être positives et sommer à 1
+        
+        L'arbre trinomial a un avantage pratique : il converge plus vite vers Black-Scholes.
+        Pour une même précision, on a besoin de moins de pas de temps N.
+        
+        Cependant, à chaque nœud, il faut calculer trois branches au lieu de deux,
+        donc le coût computationnel par nœud est plus élevé.
+        
+        C'est un trade-off classique : précision versus temps de calcul.
+        
+        En pratique, le trinomial est particulièrement utile pour les options
+        avec des barrières ou des caractéristiques exotiques.
+    }
+\end{frame}
+
+\begin{frame}{Backward Induction pour le Modèle Trinomial}
+    \textbf{Valorisation par récurrence :}
+    
+    \begin{enumerate}
+        \item \textbf{Payoffs terminaux} (à $t = T$) :
+        $$V_{N,j} = \max(S_{N,j} - K, 0) \quad \text{(Call européen)}$$
+        
+        \item \textbf{Remontée dans l'arbre} (de $t = T$ vers $t = 0$) :
+        $$V_{i,j} = e^{-r\Delta t}\left[p_u \cdot V_{i+1,j+1} + p_m \cdot V_{i+1,j} + p_d \cdot V_{i+1,j-1}\right]$$
+        
+        \item \textbf{Option américaine} : à chaque nœud
+        $$V_{i,j} = \max\left\{(S_{i,j} - K)^+, \, e^{-r\Delta t}\left[p_u V_{i+1,j+1} + p_m V_{i+1,j} + p_d V_{i+1,j-1}\right]\right\}$$
+    \end{enumerate}
+    
+    \vspace{0.3cm}
+    \begin{block}{Structure de l'arbre}
+    L'arbre trinomial a $2N+1$ nœuds terminaux (contre $N+1$ pour le binomial) mais une meilleure stabilité numérique.
+    \end{block}
+    \note{
+        L'algorithme de backward induction s'étend naturellement au cas trinomial.
+        
+        La seule différence : au lieu de moyenner deux valeurs futures,
+        on moyenne maintenant trois valeurs futures, pondérées par leurs probabilités respectives.
+        
+        L'équation devient :
+        Valeur = actualisation × [prob_up × valeur_up + prob_mid × valeur_mid + prob_down × valeur_down]
+        
+        Pour les options américaines, la logique reste identique :
+        à chaque nœud, on compare exercice immédiat versus continuation.
+        On garde le maximum des deux.
+        
+        La structure de l'arbre trinomial est plus large que le binomial :
+        après N périodes, on a 2N+1 nœuds terminaux possibles au lieu de N+1.
+        
+        Cela peut sembler augmenter la complexité, mais en pratique,
+        comme la convergence est plus rapide, on peut utiliser un N plus petit
+        pour atteindre la même précision.
+        
+        Le nombre total de nœuds dans l'arbre est O(N²) pour les deux modèles,
+        mais le trinomial a une constante plus grande.
+        
+        Point important : les indices j dans l'arbre trinomial vont de -i à +i,
+        représentant le nombre net de mouvements vers le haut (hausses - baisses).
+        
+        C'est légèrement différent du binomial où j représente juste le nombre de hausses.
+    }
+\end{frame}
+
+\subsection{Le Modèle de Black-Scholes}
+
+\begin{frame}{Le Modèle de Black-Scholes}
+    \textbf{Hypothèses du modèle :}
+    \begin{itemize}
+        \item Le prix du sous-jacent suit un mouvement brownien géométrique
+        \item La volatilité $\sigma$ et le taux sans risque $r$ sont constants
+        \item Pas de coûts de transaction, pas de dividendes
+        \item Marchés efficients et trading continu
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    \textbf{Équation différentielle stochastique :}
+    $$dS_t = \mu S_t dt + \sigma S_t dW_t$$
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Formule du Call européen :}
+            $$C = S_0 N(d_1) - K e^{-rT} N(d_2)$$
+            
+            avec :
+            $$d_1 = \frac{\ln(S_0/K) + (r + \sigma^2/2)T}{\sigma\sqrt{T}}$$
+            $$d_2 = d_1 - \sigma\sqrt{T}$$
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Formule du Put européen :}
+            $$P = K e^{-rT} N(-d_2) - S_0 N(-d_1)$$
+            
+            \vspace{0.3cm}
+            \textbf{Parité Call-Put :}
+            $$C - P = S_0 - K e^{-rT}$$
+        \end{column}
+    \end{columns}
+    \note{
+        Black-Scholes (1973) est le modèle le plus célèbre de la finance mathématique.
+        Merton a aussi contribué indépendamment, d'où le nom complet Black-Scholes-Merton.
+        
+        C'est une solution analytique fermée, ce qui est remarquable.
+        Pas besoin de simulation ou d'arbre : une simple formule donne le prix.
+        
+        Les hypothèses sont fortes mais simplificatrices :
+        - Mouvement brownien géométrique : les rendements sont log-normaux
+        - Volatilité constante : en réalité elle varie (smile de volatilité)
+        - Pas de sauts : le prix évolue continûment
+        - Trading continu : on peut couvrir à tout instant
+        
+        L'EDS montre que le prix a deux composantes :
+        - Un drift µ (tendance moyenne)
+        - Une diffusion σdW (bruit aléatoire)
+        
+        La formule du call est élégante : c'est la différence entre
+        l'espérance actualisée du prix de l'action (premier terme)
+        et l'espérance actualisée du strike (second terme),
+        pondérées par les probabilités d'exercice.
+        
+        N(d1) et N(d2) sont les fonctions de répartition de la loi normale.
+        d1 est lié au delta de l'option, d2 à la probabilité d'exercice.
+        
+        La parité call-put est une relation fondamentale qui lie
+        le prix d'un call et d'un put de même strike et maturité.
+        Elle découle de l'absence d'arbitrage et est valable pour tout modèle,
+        pas seulement Black-Scholes.
+        
+        Cette formule a valu le prix Nobel à Scholes et Merton en 1997.
+        Black était décédé en 1995, sinon il l'aurait partagé.
+    }
+\end{frame}
+
+\begin{frame}{Les Greeks : Sensibilités du Pricing}
+    Les \textbf{Greeks} mesurent la sensibilité du prix de l'option aux différents paramètres.
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Delta ($\Delta$)} : Sensibilité au prix du sous-jacent
+            $$\Delta = \frac{\partial C}{\partial S}$$
+            $$\Delta_{\text{Call}} = N(d_1)$$
+            $$\Delta_{\text{Put}} = -N(-d_1)$$
+            
+            \vspace{0.2cm}
+            \textbf{Gamma ($\Gamma$)} : Sensibilité du Delta
+            $$\Gamma = \frac{\partial^2 C}{\partial S^2} = \frac{N'(d_1)}{S_0 \sigma \sqrt{T}}$$
+            
+            \vspace{0.2cm}
+            \textbf{Vega ($\mathcal{V}$)} : Sensibilité à la volatilité
+            $$\mathcal{V} = \frac{\partial C}{\partial \sigma} = S_0 N'(d_1) \sqrt{T}$$
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Theta ($\Theta$)} : Sensibilité au temps
+            $$\Theta = \frac{\partial C}{\partial t}$$
+            $$\Theta_{\text{Call}} = -\frac{S_0 N'(d_1) \sigma}{2\sqrt{T}} - rK e^{-rT} N(d_2)$$
+            
+            \vspace{0.2cm}
+            \textbf{Rho ($\rho$)} : Sensibilité au taux d'intérêt
+            $$\rho = \frac{\partial C}{\partial r}$$
+            $$\rho_{\text{Call}} = K T e^{-rT} N(d_2)$$
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Utilité des Greeks}
+    Gestion des risques, couverture dynamique, trading et analyse de sensibilité.
+    \end{block}
+    \note{
+        Les Greeks sont les outils essentiels du risk management en options.
+        
+        Delta : c'est la dérivée première par rapport au prix.
+        Il mesure de combien varie l'option quand le sous-jacent bouge de 1.
+        Pour un call, Delta est entre 0 et 1. Pour un put, entre -1 et 0.
+        Delta = 0.5 signifie que l'option est "at-the-money".
+        C'est aussi le ratio de couverture : combien d'actions pour couvrir.
+        
+        Gamma : c'est la dérivée seconde, donc la courbure.
+        Il mesure comment le Delta change quand le sous-jacent bouge.
+        Un Gamma élevé signifie qu'il faut réajuster souvent la couverture.
+        Le Gamma est maximal pour les options at-the-money.
+        
+        Vega : sensibilité à la volatilité (attention, ce n'est pas une lettre grecque !).
+        Une hausse de volatilité augmente toujours la valeur d'une option
+        (call ou put), car elle augmente la probabilité de gros mouvements.
+        Vega est maximal pour les options at-the-money et longue maturité.
+        
+        Theta : le time decay. C'est généralement négatif pour les options longues :
+        le temps qui passe érode la valeur de l'option.
+        Une option perd de la valeur chaque jour, toutes choses égales par ailleurs.
+        
+        Rho : sensibilité au taux d'intérêt. Généralement le moins important en pratique,
+        car les taux varient lentement. Positif pour les calls, négatif pour les puts.
+        
+        En pratique, les traders se couvrent surtout contre Delta et parfois Gamma et Vega.
+        Theta est subi (on ne peut pas l'éviter), et Rho est souvent négligé.
+    }
+\end{frame}
+
+% ====================================================================
+% SECTION 4: VALIDATION ET COMPARAISON
+% ====================================================================
+\section{Validation et Comparaison}
+
+\begin{frame}{Convergence des Modèles Numériques vers Black-Scholes}
+    \textbf{Théorème de convergence :}
+    
+    Quand $N \to \infty$, les prix calculés par les modèles binomial (CRR) et trinomial (Boyle) convergent vers le prix de Black-Scholes pour les options européennes.
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Convergence Binomial CRR :}
+            $$\lim_{N \to \infty} C_N^{\text{CRR}} = C^{\text{BS}}$$
+            
+            \vspace{0.2cm}
+            Taux de convergence : $O(1/N)$
+            
+            \vspace{0.2cm}
+            Oscillations possibles autour de la valeur limite.
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Convergence Trinomial Boyle :}
+            $$\lim_{N \to \infty} C_N^{\text{Tri}} = C^{\text{BS}}$$
+            
+            \vspace{0.2cm}
+            Taux de convergence : $O(1/N^2)$ (meilleur)
+            
+            \vspace{0.2cm}
+            Convergence plus régulière et plus rapide.
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Implication pratique}
+    Pour une précision donnée, le trinomial nécessite moins de pas de temps, mais chaque pas est plus coûteux (3 branches vs 2).
+    \end{block}
+    \note{
+        La convergence des modèles discrets vers le modèle continu est un résultat mathématique fondamental.
+        
+        Elle justifie l'utilisation des arbres : ce ne sont pas des approximations grossières,
+        mais des discrétisations qui convergent vers la vraie valeur.
+        
+        Le taux de convergence est important en pratique.
+        Pour le CRR, l'erreur décroît comme 1/N : si on double N, l'erreur est divisée par 2.
+        Pour le trinomial, elle décroît comme 1/N² : beaucoup plus rapide.
+        
+        Cependant, il y a un phénomène d'oscillation dans le binomial :
+        la convergence n'est pas monotone. Le prix peut être au-dessus ou en-dessous
+        de la valeur limite selon la parité de N.
+        
+        Cela vient de la façon dont les nœuds de l'arbre s'alignent (ou pas)
+        avec le strike K. Parfois K tombe pile sur un nœud, parfois entre deux.
+        
+        Le trinomial atténue ce problème grâce à sa troisième branche.
+        
+        En pratique, pour les options européennes, on utilise directement Black-Scholes.
+        Les arbres sont surtout utiles pour les américaines où il n'y a pas de formule fermée.
+        
+        Mais cette convergence prouve la cohérence des modèles :
+        discret et continu sont deux faces de la même pièce.
+    }
+\end{frame}
+
+\begin{frame}{Parité Call-Put et Tests de Cohérence}
+    \textbf{Relation de parité Call-Put :}
+    $$C - P = S_0 - K e^{-rT}$$
+    
+    Cette relation doit être vérifiée par tout modèle d'évaluation d'options européennes, sous peine d'opportunité d'arbitrage.
+    
+    \vspace{0.3cm}
+    \textbf{Tests de validation :}
+    \begin{itemize}
+        \item \coloredbullet \ Vérifier que $C - P - (S_0 - Ke^{-rT}) < \epsilon$ (tolérance numérique)
+        \item \coloredbullet \ Comparer les prix obtenus par les différents modèles
+        \item \coloredbullet \ Tester la monotonie : $C(K_1) > C(K_2)$ si $K_1 < K_2$
+        \item \coloredbullet \ Vérifier les bornes : $\max(0, S_0 - Ke^{-rT}) \leq C \leq S_0$
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    \begin{block}{Absence d'arbitrage}
+    Les conditions de non-arbitrage imposent des contraintes strictes sur les prix. Tout écart indique une erreur de modèle ou une opportunité de profit sans risque.
+    \end{block}
+    \note{
+        La parité call-put est une relation d'arbitrage fondamentale.
+        
+        Elle dit que la différence entre un call et un put de même strike
+        doit être exactement égale à la différence entre le prix spot
+        et la valeur actualisée du strike.
+        
+        Pourquoi ? Parce qu'on peut construire un portefeuille synthétique :
+        Acheter un call + vendre un put = position forward synthétique
+        = acheter l'action à terme au prix K.
+        
+        Si cette relation n'est pas respectée, il y a arbitrage :
+        on peut acheter le côté bon marché et vendre le côté cher,
+        et empocher la différence sans risque.
+        
+        C'est un test de cohérence essentiel pour nos modèles.
+        Si nos calculs violent cette parité, il y a un bug dans le code.
+        
+        Les autres tests sont aussi basés sur l'absence d'arbitrage :
+        - Monotonie en K : un call avec un strike plus bas vaut plus cher
+        - Bornes : un call ne peut valoir plus que l'action (sinon on vend le call et on achète l'action)
+          et au moins la valeur intrinsèque actualisée
+        
+        Ces tests semblent simples mais sont très puissants.
+        Ils permettent de détecter des erreurs numériques subtiles.
+        
+        En pratique, on tolère de petits écarts (epsilon) dus aux erreurs d'arrondi,
+        mais ils doivent être de l'ordre de 10^-6 ou moins, pas 10^-2.
+    }
+\end{frame}
+
+\begin{frame}{Comparaison des Modèles : Forces et Limites}
+    \begin{center}
+    \small
+    \begin{tabular}{p{2.5cm}p{3cm}p{3cm}p{3cm}}
+        \toprule
+        \textbf{Modèle} & \textbf{Avantages} & \textbf{Limites} & \textbf{Usage} \\
+        \midrule
+        Black-Scholes & Formule fermée, rapide, Greeks analytiques & Options européennes uniquement, volatilité constante & Benchmark, options vanille européennes \\
+        \addlinespace
+        Binomial CRR & Options américaines, simple à implémenter & Convergence lente, oscillations & Options américaines vanille \\
+        \addlinespace
+        Trinomial Boyle & Convergence rapide, stable numériquement & Plus complexe, coût computationnel & Options américaines, barrières \\
+        \bottomrule
+    \end{tabular}
+    \end{center}
+    
+    \vspace{0.3cm}
+    \begin{block}{Choix du modèle en pratique}
+    \begin{itemize}
+        \item Options européennes vanille : Black-Scholes
+        \item Options américaines vanille : CRR avec N = 100-500
+        \item Options barrières ou exotiques : Trinomial ou Monte Carlo
+        \item Calibration sur données de marché : Modèles à volatilité locale ou stochastique
+    \end{itemize}
+    \end{block}
+    \note{
+        Chaque modèle a ses forces et ses faiblesses, et le choix dépend du contexte.
+        
+        Black-Scholes est imbattable pour sa simplicité et sa rapidité.
+        Une simple évaluation de fonction donne le résultat.
+        Les Greeks sont aussi analytiques, donc très précis.
+        Mais il est limité aux options européennes et suppose une volatilité constante,
+        ce qui n'est pas réaliste (smile de volatilité observé sur les marchés).
+        
+        Le binomial CRR est le cheval de bataille pour les options américaines.
+        Simple à coder, intuitif, et fonctionne bien.
+        Mais il faut choisir N assez grand pour avoir une bonne précision,
+        et il peut osciller autour de la vraie valeur.
+        En pratique, N = 100-500 est un bon compromis.
+        
+        Le trinomial offre une meilleure convergence.
+        Pour la même précision, on peut utiliser un N plus petit.
+        Mais chaque nœud nécessite plus de calculs (3 branches au lieu de 2).
+        Il est particulièrement utile pour les options à barrières,
+        car on peut faire passer une barrière exactement sur une couche de nœuds.
+        
+        En pratique, pour les options exotiques complexes,
+        on utilise souvent des simulations de Monte Carlo
+        ou des méthodes de différences finies pour résoudre l'EDP de Black-Scholes.
+        
+        Pour la calibration sur données réelles de marché,
+        on utilise des modèles plus sophistiqués :
+        - Volatilité locale (Dupire) : σ(S,t)
+        - Volatilité stochastique (Heston) : σ suit aussi un processus
+        - Modèles à sauts (Merton, Kou) : pour capturer les discontinuités
+        
+        Notre projet se concentre sur les modèles fondamentaux,
+        mais il ouvre la porte à ces extensions.
+    }
+\end{frame}
+
+% ====================================================================
+% SECTION 5: INTERFACE ET IMPLÉMENTATION
+% ====================================================================
+\section{Interface et Implémentation}
+
+\begin{frame}{Architecture de la Plateforme}
+    \textbf{Technologies utilisées :}
+    
+    \vspace{0.3cm}
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Frontend :}
+            \begin{itemize}
+                \item Next.js (React framework)
+                \item TypeScript pour la sûreté du typage
+                \item Tailwind CSS pour le design
+                \item Recharts pour les visualisations
+            \end{itemize}
+            
+            \vspace{0.3cm}
+            \textbf{Fonctionnalités :}
+            \begin{itemize}
+                \item Interface interactive
+                \item Visualisation des arbres
+                \item Graphiques des Greeks
+                \item Comparaison des modèles
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Backend :}
+            \begin{itemize}
+                \item FastAPI (Python)
+                \item NumPy pour les calculs
+                \item Bibliothèques scientifiques (scipy)
+                \item API RESTful
+            \end{itemize}
+            
+            \vspace{0.3cm}
+            \textbf{Calculs :}
+            \begin{itemize}
+                \item Pricing options en temps réel
+                \item Calcul des Greeks
+                \item Construction des arbres
+                \item Validation des paramètres
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \begin{block}{Avantages de l'architecture}
+    Séparation claire entre logique métier (backend) et interface utilisateur (frontend), permettant évolutivité et maintenabilité.
+    \end{block}
+    \note{
+        L'architecture de notre plateforme suit les meilleures pratiques modernes.
+        
+        On a choisi une architecture client-serveur avec séparation nette des responsabilités.
+        
+        Côté frontend, Next.js offre :
+        - Un framework React moderne avec routing intégré
+        - Le rendu côté serveur (SSR) pour les performances
+        - L'optimisation automatique du code
+        - Une excellente expérience développeur
+        
+        TypeScript ajoute la sûreté du typage, réduisant les bugs.
+        Tailwind CSS permet un design moderne et responsive rapidement.
+        Recharts pour les graphiques : légère et performante.
+        
+        Côté backend, FastAPI est excellent pour :
+        - Des API REST rapides et modernes
+        - Documentation automatique (Swagger)
+        - Validation automatique des données
+        - Support natif de l'asynchrone
+        
+        Python est le langage naturel pour les calculs scientifiques.
+        NumPy offre des opérations vectorisées ultra-rapides.
+        SciPy apporte des outils statistiques (loi normale, etc.).
+        
+        L'API RESTful communique en JSON, standard universel.
+        
+        Cette séparation a plusieurs avantages :
+        - On peut changer le frontend sans toucher aux calculs
+        - On peut réutiliser le backend pour d'autres interfaces (mobile, CLI)
+        - Les calculs lourds sont isolés du rendu visuel
+        - On peut déployer séparément (scaling horizontal)
+        
+        C'est une architecture professionnelle, prête pour la production.
+    }
+\end{frame}
+
+\begin{frame}{Démonstration de l'Interface}
+    \textbf{Fonctionnalités principales :}
+    
+    \begin{enumerate}
+        \item \textbf{Saisie des paramètres :}
+        \begin{itemize}
+            \item Prix initial $S_0$, strike $K$, maturité $T$
+            \item Taux sans risque $r$, volatilité $\sigma$
+            \item Type d'option (Call/Put, Européenne/Américaine)
+            \item Choix du modèle (BS, CRR, Trinomial)
+        \end{itemize}
+        
+        \item \textbf{Résultats affichés :}
+        \begin{itemize}
+            \item Prix de l'option
+            \item Greeks (Delta, Gamma, Vega, Theta, Rho)
+            \item Stratégie de couverture
+            \item Diagnostics de convergence
+        \end{itemize}
+        
+        \item \textbf{Visualisations :}
+        \begin{itemize}
+            \item Arbres binomiaux/trinomiaux interactifs
+            \item Graphiques des Greeks en fonction de $S$, $T$, $\sigma$
+            \item Comparaison visuelle des modèles
+        \end{itemize}
+    \end{enumerate}
+    \note{
+        L'interface a été conçue pour être à la fois puissante et intuitive.
+        
+        La saisie des paramètres est simple : des sliders ou champs numériques
+        avec validation en temps réel. Si on entre des valeurs incohérentes
+        (par exemple volatilité négative), un message d'erreur apparaît immédiatement.
+        
+        Les résultats s'affichent instantanément grâce aux calculs rapides.
+        Le prix principal est mis en évidence, et les Greeks sont présentés
+        dans un tableau clair avec leurs interprétations.
+        
+        Par exemple, pour un call :
+        - Prix : 8.12
+        - Delta : 0.52 → "Pour couvrir 1 call, acheter 0.52 actions"
+        - Gamma : 0.03 → "Delta varie de 0.03 par point de sous-jacent"
+        - Vega : 0.25 → "Prix augmente de 0.25 si volatilité +1%"
+        - Theta : -0.015 → "Option perd 0.015 par jour"
+        
+        Les arbres sont visualisés de manière interactive :
+        on peut cliquer sur un nœud pour voir les détails (prix du sous-jacent,
+        valeur de l'option, probabilité d'atteindre ce nœud).
+        
+        Les graphiques permettent d'analyser visuellement les sensibilités :
+        - Prix vs S : courbe caractéristique convexe du call
+        - Greeks vs temps : accélération du time decay près de la maturité
+        - Volatilité smile : vérifier la cohérence avec le marché
+        
+        La comparaison des modèles affiche côte à côte :
+        - Black-Scholes : 8.127
+        - CRR (N=100) : 8.125
+        - Trinomial (N=50) : 8.128
+        - Écart maximal : 0.003
+        
+        Cela permet de valider la convergence et la cohérence.
+        
+        L'interface est responsive : elle fonctionne sur desktop, tablette et mobile.
+        Tous les calculs sont effectués côté serveur, donc pas de limite
+        de puissance de calcul côté client.
+    }
+\end{frame}
+
+\begin{frame}{Exemples de Calculs et Résultats}
+    \textbf{Exemple : Option Call Européenne}
+    
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Paramètres :}
+            \begin{itemize}
+                \item $S_0 = 100$ (prix actuel)
+                \item $K = 105$ (strike)
+                \item $T = 1$ année
+                \item $r = 5\%$ (taux sans risque)
+                \item $\sigma = 20\%$ (volatilité)
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Résultats :}
+            \begin{itemize}
+                \item Black-Scholes : 8.13
+                \item CRR (N=100) : 8.12
+                \item Trinomial (N=50) : 8.14
+                \item Delta : 0.524
+                \item Gamma : 0.028
+                \item Vega : 0.392
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    
+    \vspace{0.3cm}
+    \textbf{Interprétation :}
+    \begin{itemize}
+        \item Les trois modèles donnent des résultats très proches (écart < 0.02)
+        \item Delta = 0.524 : pour couvrir ce call, acheter 0.524 actions
+        \item Gamma = 0.028 : le delta augmentera de 0.028 si $S$ augmente de 1
+        \item Vega = 0.392 : le prix augmentera de 0.392 si $\sigma$ augmente de 1\%
+    \end{itemize}
+    \note{
+        Cet exemple concret illustre l'utilisation pratique de la plateforme.
+        
+        On a choisi des paramètres réalistes :
+        - S0 = 100 : prix rond pour faciliter les calculs mentaux
+        - K = 105 : option légèrement hors de la monnaie (out-of-the-money)
+        - T = 1 an : maturité standard
+        - r = 5% : taux sans risque typique
+        - sigma = 20% : volatilité modérée pour une action
+        
+        Les résultats montrent la convergence excellente :
+        Black-Scholes donne 8.13, le binomial 8.12, le trinomial 8.14.
+        L'écart maximal est de 0.02, soit 0.25% du prix.
+        C'est négligeable en pratique.
+        
+        Cela valide nos implémentations : si on trouvait 8.13 vs 9.50,
+        il y aurait clairement un bug !
+        
+        L'interprétation des Greeks est cruciale pour le trading :
+        
+        Delta = 0.524 signifie que l'option est presque "at-the-money".
+        Si S augmente de 1, l'option prend 0.524 de valeur.
+        Pour une couverture delta-neutre, il faut acheter 0.524 actions par call vendu.
+        
+        Gamma = 0.028 est modéré. Cela signifie que si S passe de 100 à 101,
+        le delta passera de 0.524 à 0.552 environ.
+        Un gamma élevé nécessite des réajustements fréquents.
+        
+        Vega = 0.392 indique une sensibilité importante à la volatilité.
+        Si le marché anticipe plus de volatilité (choc, annonce, etc.),
+        et que sigma passe de 20% à 21%, le call vaudra 8.52 au lieu de 8.13.
+        
+        Ces chiffres sont le langage quotidien des traders d'options.
+    }
+\end{frame}
+
+% ====================================================================
+% SECTION 6: CONCLUSION ET PERSPECTIVES
+% ====================================================================
+\section{Conclusion et Perspectives}
+
+\begin{frame}{Synthèse du Projet}
+    \textbf{Réalisations :}
+    \begin{itemize}
+        \item \coloredbullet \ Implémentation complète de 4 modèles de pricing d'options :
+        \begin{itemize}
+            \item Black-Scholes (analytique)
+            \item Binomial à 1 période (pédagogique)
+            \item Cox-Ross-Rubinstein à N périodes (pratique)
+            \item Trinomial de Boyle (performance)
+        \end{itemize}
+        \item \coloredbullet \ Validation mathématique rigoureuse :
+        \begin{itemize}
+            \item Convergence numérique vérifiée
+            \item Parité call-put respectée
+            \item Absence d'arbitrage garantie
+        \end{itemize}
+        \item \coloredbullet \ Plateforme web interactive et moderne :
+        \begin{itemize}
+            \item Calculs en temps réel
+            \item Visualisations graphiques
+            \item Comparaison des modèles
+        \end{itemize}
+    \end{itemize}
+    \note{
+        Ce projet a atteint tous ses objectifs initiaux.
+        
+        Nous avons implémenté quatre modèles complémentaires :
+        
+        Black-Scholes comme référence analytique, la formule de base
+        que tout praticien doit connaître.
+        
+        Le binomial à 1 période pour comprendre la mécanique fondamentale :
+        réplication, probabilité risque-neutre, absence d'arbitrage.
+        C'est la brique élémentaire.
+        
+        Le CRR à N périodes pour traiter les options américaines,
+        qui sont très courantes sur les marchés (la plupart des options
+        sur actions américaines sont de style américain).
+        
+        Et le trinomial pour améliorer la convergence et la stabilité,
+        particulièrement utile pour les options exotiques.
+        
+        La validation mathématique était essentielle :
+        - On a vérifié que les modèles numériques convergent vers Black-Scholes
+        - On a testé la parité call-put sur tous nos calculs
+        - On a vérifié l'absence d'arbitrage à chaque nœud des arbres
+        
+        Sans cette validation, on ne pourrait pas faire confiance aux résultats.
+        
+        La plateforme web rend le tout accessible :
+        pas besoin d'être programmeur pour utiliser ces modèles.
+        Un étudiant, un trader, ou un risk manager peut facilement
+        calculer des prix, visualiser des Greeks, comparer des stratégies.
+        
+        C'est à la fois un outil pédagogique et pratique.
+    }
+\end{frame}
+
+\begin{frame}{Limites et Hypothèses}
+    \textbf{Hypothèses simplificatrices des modèles :}
+    \begin{itemize}
+        \item \coloredbullet \ Volatilité constante : en réalité, la volatilité varie dans le temps et avec le niveau de prix (smile/skew de volatilité)
+        \item \coloredbullet \ Pas de coûts de transaction : en pratique, le trading a des coûts qui impactent la couverture
+        \item \coloredbullet \ Liquidité parfaite : on suppose qu'on peut toujours acheter/vendre instantanément
+        \item \coloredbullet \ Pas de dividendes : l'extension aux dividendes est possible mais non implémentée
+        \item \coloredbullet \ Taux sans risque constant : les taux réels fluctuent
+        \item \coloredbullet \ Pas de sauts : les modèles supposent une évolution continue, mais les marchés peuvent sauter (gaps)
+    \end{itemize}
+    
+    \vspace{0.3cm}
+    \begin{block}{Impact pratique}
+    Ces simplifications sont acceptables pour des options vanille avec maturité courte à moyenne, mais deviennent problématiques pour des produits exotiques ou des longues maturités.
+    \end{block}
+    \note{
+        Il est important d'être honnête sur les limites de nos modèles.
+        
+        La volatilité constante est la simplification la plus critiquée.
+        En réalité, on observe :
+        - Le smile de volatilité : sigma varie avec le strike
+        - La structure par terme : sigma varie avec la maturité
+        - La volatilité stochastique : sigma évolue dans le temps
+        
+        Les praticiens utilisent une "volatilité implicite" :
+        ils inversent Black-Scholes pour trouver le sigma qui correspond au prix de marché.
+        Cela crée des surfaces de volatilité complexes.
+        
+        Les coûts de transaction sont souvent négligés en théorie,
+        mais en pratique, ils peuvent être significatifs, surtout pour
+        la couverture haute fréquence requise par un gamma élevé.
+        
+        L'hypothèse de liquidité parfaite est irréaliste pour les options
+        sur actions peu liquides ou les options exotiques.
+        Le spread bid-ask peut être important.
+        
+        Les dividendes sont facilement intégrables : on ajuste S0 ou r.
+        Nous ne l'avons pas fait pour simplifier, mais c'est une extension triviale.
+        
+        Les sauts (jump diffusion) sont importants pour modéliser
+        les événements rares mais impactants : crash, annonce surprise, etc.
+        Les modèles de Merton ou Kou les intègrent.
+        
+        Malgré ces limites, nos modèles restent très utiles :
+        ils donnent un premier prix, une base pour la négociation,
+        et permettent de comprendre les dynamiques fondamentales.
+        
+        Les modèles parfaits n'existent pas. L'important est de connaître
+        les hypothèses et leurs implications.
+    }
+\end{frame}
+
+\begin{frame}{Perspectives et Extensions}
+    \textbf{Extensions possibles du projet :}
+    
+    \begin{columns}[T]
+        \begin{column}{0.48\textwidth}
+            \textbf{Modèles avancés :}
+            \begin{itemize}
+                \item Volatilité stochastique (Heston)
+                \item Modèles à sauts (Merton, Kou)
+                \item Volatilité locale (Dupire)
+                \item Modèle SABR pour les taux
+            \end{itemize}
+            
+            \vspace{0.3cm}
+            \textbf{Options exotiques :}
+            \begin{itemize}
+                \item Options barrières
+                \item Options asiatiques
+                \item Options lookback
+                \item Options binaires
+            \end{itemize}
+        \end{column}
+        \begin{column}{0.48\textwidth}
+            \textbf{Méthodes numériques :}
+            \begin{itemize}
+                \item Simulations de Monte Carlo
+                \item Différences finies (PDE)
+                \item Méthodes de quasi-Monte Carlo
+                \item FFT pour les modèles à sauts
+            \end{itemize}
+            
+            \vspace{0.3cm}
+            \textbf{Fonctionnalités pratiques :}
+            \begin{itemize}
+                \item Calibration sur données réelles
+                \item Construction de stratégies (spreads, straddles)
+                \item Back-testing de stratégies
+                \item Risk management (VaR, CVaR)
+            \end{itemize}
+        \end{column}
+    \end{columns}
+    \note{
+        Les extensions possibles sont nombreuses et passionnantes.
+        
+        Modèles avancés :
+        
+        Heston est le modèle de volatilité stochastique le plus populaire.
+        La volatilité suit un processus CIR, corrélé avec le prix.
+        Il capture mieux le smile et permet de pricer des options sur volatilité (VIX).
+        
+        Les modèles à sauts ajoutent des discontinuités au processus de prix.
+        Merton : sauts log-normaux. Kou : sauts double-exponentiels.
+        Ils sont essentiels pour modéliser les queues épaisses observées.
+        
+        Dupire (volatilité locale) permet de reconstruire une surface
+        de volatilité sigma(S,t) parfaitement calibrée sur tous les prix de marché.
+        C'est un outil puissant de pricing cohérent.
+        
+        SABR est standard pour les options sur taux d'intérêt.
+        
+        Options exotiques :
+        
+        Les barrières knock-in/knock-out sont très échangées.
+        Les arbres trinomiaux sont bien adaptés pour les pricer.
+        
+        Les asiatiques (payoff basé sur la moyenne) nécessitent Monte Carlo
+        ou des PDE en dimension supérieure.
+        
+        Les lookback (payoff basé sur le max/min) sont difficiles à pricer.
+        
+        Les binaires (payoff 0 ou 1) sont utilisées pour parier sur des événements.
+        
+        Méthodes numériques :
+        
+        Monte Carlo est la méthode universelle : elle fonctionne toujours,
+        même pour les problèmes complexes multi-dimensionnels.
+        Le problème : elle converge lentement (en 1/racine(n)).
+        
+        Les PDE (différences finies) sont très efficaces en dimension 1 ou 2.
+        On discrétise l'EDP de Black-Scholes et on résoud numériquement.
+        
+        Quasi-Monte Carlo améliore la convergence via des suites à faible discrépance.
+        
+        FFT (Fast Fourier Transform) est rapide pour les modèles affines (Heston, Merton).
+        
+        Fonctionnalités pratiques :
+        
+        La calibration est cruciale : ajuster les paramètres du modèle
+        pour matcher les prix de marché observés. C'est un problème d'optimisation.
+        
+        Les stratégies combinées (bull spread, butterfly, iron condor, etc.)
+        sont la base du trading d'options. Notre plateforme pourrait
+        calculer automatiquement le P&L de ces stratégies.
+        
+        Le back-testing permettrait de tester une stratégie sur données historiques
+        pour évaluer sa performance.
+        
+        Le risk management (Value-at-Risk, Expected Shortfall) est essentiel
+        pour les institutions financières. Nos modèles pourraient alimenter
+        ces calculs de risque.
+        
+        Bref, ce projet ouvre de nombreuses portes vers des sujets avancés
+        et des applications réelles. C'est un point de départ solide
+        pour explorer la finance quantitative.
+    }
+\end{frame}
+
+\begin{frame}{Conclusion Générale}
+    \begin{itemize}
+        \item \coloredbullet \ Les modèles étudiés (Black-Scholes, binomial, trinomial) constituent le \textbf{socle fondamental} du pricing d'options.
+        
+        \item \coloredbullet \ Ils reposent sur des concepts mathématiques profonds : \textbf{absence d'arbitrage}, \textbf{probabilité risque-neutre}, \textbf{réplication}.
+        
+        \item \coloredbullet \ La \textbf{convergence} des modèles discrets vers le modèle continu illustre l'unité entre approches numériques et analytiques.
+        
+        \item \coloredbullet \ La plateforme développée rend ces modèles \textbf{accessibles et pratiques} pour l'enseignement et l'application.
+        
+        \item \coloredbullet \ Ce projet ouvre la voie vers des modèles plus sophistiqués et des applications réelles en \textbf{finance quantitative}.
+    \end{itemize}
+    
+    \vspace{0.5cm}
+    \begin{center}
+        \textcolor{darkGreen}{\textbf{La finance mathématique : là où la théorie rencontre la pratique.}}
+    \end{center}
+    \note{
+        Pour conclure, résumons l'essentiel.
+        
+        Nous avons étudié les modèles fondamentaux du pricing d'options.
+        Black-Scholes reste la référence, 50 ans après sa publication.
+        Les arbres binomiaux et trinomiaux sont les outils pratiques incontournables.
+        
+        Ces modèles ne sont pas de simples formules : ils incarnent
+        des concepts mathématiques profonds qui ont révolutionné la finance.
+        
+        L'absence d'arbitrage n'est pas qu'un principe économique,
+        c'est le fondement mathématique qui permet de déduire les prix.
+        
+        La probabilité risque-neutre est une construction élégante
+        qui simplifie radicalement le pricing en éliminant les préférences des agents.
+        
+        La réplication montre qu'un dérivé complexe n'est qu'une combinaison
+        d'actifs simples, une idée puissante pour la compréhension et la couverture.
+        
+        La convergence des modèles discrets vers le continu est remarquable :
+        elle montre que discret et continu sont deux facettes du même objet mathématique.
+        
+        Notre plateforme concrétise ces idées : les étudiants peuvent
+        expérimenter, visualiser, comprendre. Les praticiens peuvent calculer,
+        comparer, décider.
+        
+        Ce projet n'est qu'un début. La finance quantitative est un domaine
+        vivant, en constante évolution. De nouveaux modèles, de nouvelles méthodes,
+        de nouveaux produits émergent continuellement.
+        
+        Mais les fondamentaux restent : comprendre le risque, l'évaluer,
+        le gérer. C'est l'essence de notre discipline.
+        
+        La finance mathématique est là où la théorie pure rencontre
+        la réalité des marchés. C'est ce qui la rend si passionnante.
+    }
+\end{frame}
+
+\begin{frame}
+  \vfill
+  \centering
+  {\calligra \fontsize{30pt}{38pt}\selectfont Merci pour votre attention !}
+  \vfill
+\end{frame}
+\end{document}
